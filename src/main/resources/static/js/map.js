@@ -20,76 +20,42 @@ function escapeHtml(value) {
     return div.innerHTML;
 }
 
-// Each floor of the house cross-section maps to a slice of the club's info.
-function floorsFor(club) {
-    const contactLines = [];
-    if (club.website) {
-        contactLines.push(`<a href="${escapeHtml(club.website)}" target="_blank" rel="noopener">Website</a>`);
-    }
-    if (club.contactEmail) {
-        contactLines.push(`<a href="mailto:${escapeHtml(club.contactEmail)}">${escapeHtml(club.contactEmail)}</a>`);
-    }
+// Levels of the club house diagram (discovery_house_clean.svg), roof to foundation —
+// each maps to one Club field and keeps the same color coding as the image.
+const LEVELS = [
+    { field: 'visionStrategy', cssClass: 'level-vision-strategy', title: 'Vision & Strategy' },
+    { field: 'governance', cssClass: 'level-governance', title: 'Governance' },
+    { field: 'communication', cssClass: 'level-communication', title: 'Communication' },
+    { field: 'finance', cssClass: 'level-finance', title: 'Finance' },
+    { field: 'humanResources', cssClass: 'level-human-resources', title: 'Human Resources' },
+    { field: 'clubActivities', cssClass: 'level-club-activities', title: 'Club Activities' },
+    { field: 'membership', cssClass: 'level-membership', title: 'Membership' }
+];
 
-    return {
-        roof: {
-            title: 'Club',
-            html: `<p>${escapeHtml(club.name)}</p><p>${escapeHtml(club.city)}</p>`
-        },
-        upper: {
-            title: 'About',
-            html: `<p>${escapeHtml(club.description) || 'No description yet.'}</p>`
-        },
-        ground: {
-            title: 'Contact',
-            html: contactLines.length ? contactLines.map(l => `<p>${l}</p>`).join('') : '<p>No contact info yet.</p>'
-        }
-    };
+function levelsHtml(club) {
+    return LEVELS.map(level => {
+        const text = club[level.field];
+        return `
+            <div class="club-level ${level.cssClass}">
+                <h3>${level.title}</h3>
+                <p>${text ? escapeHtml(text) : '—'}</p>
+            </div>
+        `;
+    }).join('');
 }
-
-const HOUSE_SVG = `
-    <svg viewBox="0 0 200 220" xmlns="http://www.w3.org/2000/svg">
-        <polygon class="floor" data-floor="roof" points="20,80 100,15 180,80" />
-        <rect class="floor" data-floor="upper" x="30" y="80" width="140" height="65" />
-        <rect class="floor" data-floor="ground" x="30" y="145" width="140" height="65" />
-        <text class="floor-label" x="100" y="55" text-anchor="middle">Roof</text>
-        <text class="floor-label" x="100" y="116" text-anchor="middle">Upper floor</text>
-        <text class="floor-label" x="100" y="181" text-anchor="middle">Ground floor</text>
-    </svg>
-`;
 
 const panel = document.getElementById('club-panel');
 const panelContent = document.getElementById('club-panel-content');
 const panelClose = document.getElementById('club-panel-close');
 
-function showFloor(floors, floorKey, svgRoot, infoBox) {
-    svgRoot.querySelectorAll('.floor').forEach(el => {
-        el.classList.toggle('active', el.dataset.floor === floorKey);
-    });
-    const floor = floors[floorKey];
-    infoBox.innerHTML = `<h3>${floor.title}</h3>${floor.html}`;
-}
-
 function openClubPanel(club) {
-    const floors = floorsFor(club);
-
     panelContent.innerHTML = `
         <div class="club-house">
-            <h2>${escapeHtml(club.name)}</h2>
-            ${HOUSE_SVG}
-            <div class="club-floor-info" id="club-floor-info"></div>
-            <p class="club-floor-hint">Click a level of the house for more.</p>
+            <h2>${escapeHtml(club.name)} — ${escapeHtml(club.city)}</h2>
+            <img class="club-house-img" src="/img/discovery_house_clean.svg" alt="Club levels diagram"/>
+            ${levelsHtml(club)}
         </div>
     `;
-
-    const svgRoot = panelContent.querySelector('svg');
-    const infoBox = panelContent.querySelector('#club-floor-info');
-
-    svgRoot.querySelectorAll('.floor').forEach(el => {
-        el.addEventListener('click', () => showFloor(floors, el.dataset.floor, svgRoot, infoBox));
-    });
-
-    showFloor(floors, 'roof', svgRoot, infoBox);
-
     panel.hidden = false;
 }
 

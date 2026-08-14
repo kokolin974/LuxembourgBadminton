@@ -39,9 +39,13 @@ public class ClubController {
         existing.setCity(updated.getCity());
         existing.setLatitude(updated.getLatitude());
         existing.setLongitude(updated.getLongitude());
-        existing.setDescription(updated.getDescription());
-        existing.setWebsite(updated.getWebsite());
-        existing.setContactEmail(updated.getContactEmail());
+        existing.setMembership(updated.getMembership());
+        existing.setClubActivities(updated.getClubActivities());
+        existing.setHumanResources(updated.getHumanResources());
+        existing.setFinance(updated.getFinance());
+        existing.setCommunication(updated.getCommunication());
+        existing.setGovernance(updated.getGovernance());
+        existing.setVisionStrategy(updated.getVisionStrategy());
         return ResponseEntity.ok(clubService.save(existing));
     }
 

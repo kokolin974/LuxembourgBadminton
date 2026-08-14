@@ -8,9 +8,13 @@ public class ClubForm {
     private String city;
     private Double latitude;
     private Double longitude;
-    private String description;
-    private String website;
-    private String contactEmail;
+    private String membership;
+    private String clubActivities;
+    private String humanResources;
+    private String finance;
+    private String communication;
+    private String governance;
+    private String visionStrategy;
 
     public String getName() {
         return name;
@@ -44,27 +48,59 @@ public class ClubForm {
         this.longitude = longitude;
     }
 
-    public String getDescription() {
-        return description;
+    public String getMembership() {
+        return membership;
     }
 
-    public void setDescription(String description) {
-        this.description = description;
+    public void setMembership(String membership) {
+        this.membership = membership;
     }
 
-    public String getWebsite() {
-        return website;
+    public String getClubActivities() {
+        return clubActivities;
     }
 
-    public void setWebsite(String website) {
-        this.website = website;
+    public void setClubActivities(String clubActivities) {
+        this.clubActivities = clubActivities;
     }
 
-    public String getContactEmail() {
-        return contactEmail;
+    public String getHumanResources() {
+        return humanResources;
     }
 
-    public void setContactEmail(String contactEmail) {
-        this.contactEmail = contactEmail;
+    public void setHumanResources(String humanResources) {
+        this.humanResources = humanResources;
+    }
+
+    public String getFinance() {
+        return finance;
+    }
+
+    public void setFinance(String finance) {
+        this.finance = finance;
+    }
+
+    public String getCommunication() {
+        return communication;
+    }
+
+    public void setCommunication(String communication) {
+        this.communication = communication;
+    }
+
+    public String getGovernance() {
+        return governance;
+    }
+
+    public void setGovernance(String governance) {
+        this.governance = governance;
+    }
+
+    public String getVisionStrategy() {
+        return visionStrategy;
+    }
+
+    public void setVisionStrategy(String visionStrategy) {
+        this.visionStrategy = visionStrategy;
     }
 }

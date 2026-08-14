@@ -77,60 +77,57 @@ header h1 {
     font-size: 1.1rem;
 }
 
-.club-house svg {
+.club-house-img {
     width: 100%;
-    max-width: 260px;
     display: block;
-    margin: 0 auto;
+    margin: 0 auto 1rem auto;
 }
 
-.club-house .floor {
-    cursor: pointer;
-    fill: #d9e8de;
-    stroke: #1f6f4d;
-    stroke-width: 1.5;
-    transition: fill 0.15s ease;
+/* Accent colors matched to the bands in discovery_house_clean.svg,
+   foundation (1) to roof (7). Shared between the club panel and the admin form. */
+:root {
+    --level-membership: #7d7d7d;
+    --level-club-activities: #d0342c;
+    --level-human-resources: #e08a1e;
+    --level-finance: #5a9216;
+    --level-communication: #2f6fb3;
+    --level-governance: #8e44ad;
+    --level-vision-strategy: #9b59d0;
 }
 
-.club-house .floor:hover {
-    fill: #bfe0cc;
+.club-level {
+    border-left: 5px solid transparent;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.6rem;
+    background: #f7f7f8;
+    border-radius: 0 6px 6px 0;
 }
 
-.club-house .floor.active {
-    fill: #1f6f4d;
+.club-level h3 {
+    margin: 0 0 0.3rem 0;
+    font-size: 0.9rem;
 }
 
-.club-house .floor-label {
-    font-size: 11px;
-    fill: #333;
-    pointer-events: none;
-    user-select: none;
+.club-level p {
+    margin: 0;
+    font-size: 0.88rem;
+    color: #333;
 }
 
-.club-floor-info {
-    margin-top: 1rem;
-    min-height: 4.5rem;
-    padding: 0.75rem;
-    background: #f4f7f5;
-    border-radius: 6px;
-}
-
-.club-floor-info h3 {
-    margin: 0 0 0.4rem 0;
-    font-size: 0.95rem;
-    color: #1f6f4d;
-}
-
-.club-floor-info p {
-    margin: 0.25rem 0;
-}
-
-.club-floor-hint {
-    margin-top: 0.5rem;
-    font-size: 0.8rem;
-    color: #777;
-    text-align: center;
-}
+.club-level.level-membership { border-left-color: var(--level-membership); }
+.club-level.level-membership h3 { color: var(--level-membership); }
+.club-level.level-club-activities { border-left-color: var(--level-club-activities); }
+.club-level.level-club-activities h3 { color: var(--level-club-activities); }
+.club-level.level-human-resources { border-left-color: var(--level-human-resources); }
+.club-level.level-human-resources h3 { color: var(--level-human-resources); }
+.club-level.level-finance { border-left-color: var(--level-finance); }
+.club-level.level-finance h3 { color: var(--level-finance); }
+.club-level.level-communication { border-left-color: var(--level-communication); }
+.club-level.level-communication h3 { color: var(--level-communication); }
+.club-level.level-governance { border-left-color: var(--level-governance); }
+.club-level.level-governance h3 { color: var(--level-governance); }
+.club-level.level-vision-strategy { border-left-color: var(--level-vision-strategy); }
+.club-level.level-vision-strategy h3 { color: var(--level-vision-strategy); }
 
 .admin {
     max-width: 700px;
@@ -173,6 +170,20 @@ header h1 {
 .admin-form-row label {
     flex: 1;
 }
+
+.admin-form-hint {
+    font-size: 0.85rem;
+    color: #777;
+    margin: 0.5rem 0 0 0;
+}
+
+.admin-form label.level-membership { border-left: 4px solid var(--level-membership); padding-left: 0.5rem; }
+.admin-form label.level-club-activities { border-left: 4px solid var(--level-club-activities); padding-left: 0.5rem; }
+.admin-form label.level-human-resources { border-left: 4px solid var(--level-human-resources); padding-left: 0.5rem; }
+.admin-form label.level-finance { border-left: 4px solid var(--level-finance); padding-left: 0.5rem; }
+.admin-form label.level-communication { border-left: 4px solid var(--level-communication); padding-left: 0.5rem; }
+.admin-form label.level-governance { border-left: 4px solid var(--level-governance); padding-left: 0.5rem; }
+.admin-form label.level-vision-strategy { border-left: 4px solid var(--level-vision-strategy); padding-left: 0.5rem; }
 
 .admin-form button {
     align-self: flex-start;

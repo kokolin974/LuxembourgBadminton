@@ -30,9 +30,13 @@ public class AdminController {
                 form.getCity(),
                 form.getLatitude(),
                 form.getLongitude(),
-                form.getDescription(),
-                form.getWebsite(),
-                form.getContactEmail()));
+                form.getMembership(),
+                form.getClubActivities(),
+                form.getHumanResources(),
+                form.getFinance(),
+                form.getCommunication(),
+                form.getGovernance(),
+                form.getVisionStrategy()));
         return "redirect:/admin/clubs";
     }
 

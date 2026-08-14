@@ -40,17 +40,34 @@
                         <input type="number" step="any" th:field="*{longitude}" required/>
                     </label>
                 </div>
-                <label>
-                    Description
-                    <textarea th:field="*{description}" rows="3"></textarea>
+                <p class="admin-form-hint">One field per level of the club house, foundation to roof:</p>
+                <label class="level-membership">
+                    Membership
+                    <textarea th:field="*{membership}" rows="2"></textarea>
                 </label>
-                <label>
-                    Website
-                    <input type="url" th:field="*{website}"/>
+                <label class="level-club-activities">
+                    Club Activities
+                    <textarea th:field="*{clubActivities}" rows="2"></textarea>
                 </label>
-                <label>
-                    Contact email
-                    <input type="email" th:field="*{contactEmail}"/>
+                <label class="level-human-resources">
+                    Human Resources
+                    <textarea th:field="*{humanResources}" rows="2"></textarea>
+                </label>
+                <label class="level-finance">
+                    Finance
+                    <textarea th:field="*{finance}" rows="2"></textarea>
+                </label>
+                <label class="level-communication">
+                    Communication
+                    <textarea th:field="*{communication}" rows="2"></textarea>
+                </label>
+                <label class="level-governance">
+                    Governance
+                    <textarea th:field="*{governance}" rows="2"></textarea>
+                </label>
+                <label class="level-vision-strategy">
+                    Vision &amp; Strategy
+                    <textarea th:field="*{visionStrategy}" rows="2"></textarea>
                 </label>
                 <button type="submit">Add club</button>
             </form>

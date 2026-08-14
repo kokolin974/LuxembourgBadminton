@@ -7,6 +7,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.validation.constraints.NotBlank;
 
+// One text field per level of the "club house" diagram (discovery_house_clean.svg),
+// from the stone foundation up to the roof.
 @Entity
 public class Club {
 
@@ -27,25 +29,44 @@ public class Club {
     private double longitude;
 
     @Column(length = 2000)
-    private String description;
+    private String membership;
 
-    private String website;
+    @Column(length = 2000)
+    private String clubActivities;
 
-    private String contactEmail;
+    @Column(length = 2000)
+    private String humanResources;
+
+    @Column(length = 2000)
+    private String finance;
+
+    @Column(length = 2000)
+    private String communication;
+
+    @Column(length = 2000)
+    private String governance;
+
+    @Column(length = 2000)
+    private String visionStrategy;
 
     protected Club() {
         // JPA
     }
 
     public Club(String name, String city, double latitude, double longitude,
-                String description, String website, String contactEmail) {
+                String membership, String clubActivities, String humanResources,
+                String finance, String communication, String governance, String visionStrategy) {
         this.name = name;
         this.city = city;
         this.latitude = latitude;
         this.longitude = longitude;
-        this.description = description;
-        this.website = website;
-        this.contactEmail = contactEmail;
+        this.membership = membership;
+        this.clubActivities = clubActivities;
+        this.humanResources = humanResources;
+        this.finance = finance;
+        this.communication = communication;
+        this.governance = governance;
+        this.visionStrategy = visionStrategy;
     }
 
     public Long getId() {
@@ -84,27 +105,59 @@ public class Club {
         this.longitude = longitude;
     }
 
-    public String getDescription() {
-        return description;
+    public String getMembership() {
+        return membership;
     }
 
-    public void setDescription(String description) {
-        this.description = description;
+    public void setMembership(String membership) {
+        this.membership = membership;
     }
 
-    public String getWebsite() {
-        return website;
+    public String getClubActivities() {
+        return clubActivities;
     }
 
-    public void setWebsite(String website) {
-        this.website = website;
+    public void setClubActivities(String clubActivities) {
+        this.clubActivities = clubActivities;
     }
 
-    public String getContactEmail() {
-        return contactEmail;
+    public String getHumanResources() {
+        return humanResources;
     }
 
-    public void setContactEmail(String contactEmail) {
-        this.contactEmail = contactEmail;
+    public void setHumanResources(String humanResources) {
+        this.humanResources = humanResources;
+    }
+
+    public String getFinance() {
+        return finance;
+    }
+
+    public void setFinance(String finance) {
+        this.finance = finance;
+    }
+
+    public String getCommunication() {
+        return communication;
+    }
+
+    public void setCommunication(String communication) {
+        this.communication = communication;
+    }
+
+    public String getGovernance() {
+        return governance;
+    }
+
+    public void setGovernance(String governance) {
+        this.governance = governance;
+    }
+
+    public String getVisionStrategy() {
+        return visionStrategy;
+    }
+
+    public void setVisionStrategy(String visionStrategy) {
+        this.visionStrategy = visionStrategy;
     }
 }
