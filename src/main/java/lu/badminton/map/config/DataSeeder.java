@@ -17,36 +17,35 @@ public class DataSeeder {
             if (clubRepository.count() > 0) {
                 return;
             }
-            clubRepository.save(new Club(
-                    "Badminton Club Luxembourg", "Luxembourg City",
-                    49.6116, 6.1319,
-                    "Open to residents of Luxembourg City and surroundings, all ages welcome.",
-                    "Youth training Wed/Fri evenings, adult league matches on Saturdays.",
-                    "3 volunteer coaches, committee of 5 elected annually.",
-                    "Funded by membership fees and a yearly municipal grant.",
-                    "Newsletter monthly, active on Instagram. Contact: contact@example.lu, https://example.lu/bcl",
-                    "Board meets monthly; general assembly each September.",
-                    "Grow youth membership and field a team in the national league by 2028."));
-            clubRepository.save(new Club(
-                    "Badminton Esch", "Esch-sur-Alzette",
-                    49.4958, 5.9806,
-                    "Competitive-focused club, tryout required for senior teams.",
-                    "Club focused on competitive league play, training 4x/week.",
-                    "2 certified coaches, physio support during tournament season.",
-                    "Sponsored by local businesses, plus membership dues.",
-                    "Contact: contact@bc-esch.lu, https://example.lu/esch",
-                    "Governed by an elected board of 7.",
-                    "Compete at the top of the national league within 5 years."));
-            clubRepository.save(new Club(
-                    "Badminton Diekirch", "Diekirch",
-                    49.8679, 6.1597,
-                    "Casual, family-friendly membership, no tryouts.",
-                    "Recreational club, open training on weekends.",
-                    "Run entirely by volunteers.",
-                    "Low membership fee, no major sponsors.",
-                    "Contact: info@bc-diekirch.lu",
-                    "Informal committee of founding members.",
-                    "Stay a welcoming, low-pressure club for the local community."));
+            // Placeholder entries — one per city from the club location list.
+            // Levels are unfilled until real data is imported (planned: CSV import).
+            clubRepository.save(placeholderClub("Bettembourg", 49.518611, 6.102778));
+            clubRepository.save(placeholderClub("Biwer", 49.702778, 6.374722));
+            clubRepository.save(placeholderClub("Dauler / Platen", 49.79321, 5.93514));
+            clubRepository.save(placeholderClub("Differdange", 49.520868, 5.892786));
+            clubRepository.save(placeholderClub("Dudelange", 49.480556, 6.0875));
+            clubRepository.save(placeholderClub("Ettelbruck", 49.8475, 6.104167));
+            clubRepository.save(placeholderClub("Hobscheid", 49.688611, 5.914722));
+            clubRepository.save(placeholderClub("Itzig", 49.583333, 6.166667));
+            clubRepository.save(placeholderClub("Junglinster", 49.707222, 6.253056));
+            clubRepository.save(placeholderClub("Kayl", 49.489167, 6.039722));
+            clubRepository.save(placeholderClub("Kehlen", 49.668333, 6.035833));
+            clubRepository.save(placeholderClub("Kopstal", 49.664444, 6.073056));
+            clubRepository.save(placeholderClub("Luxembourg", 49.609819, 6.132684));
+            clubRepository.save(placeholderClub("Reckange-sur-Mess", 49.5625, 6.008889));
+            clubRepository.save(placeholderClub("Sandweiler", 49.61471, 6.22221));
+            clubRepository.save(placeholderClub("Schifflange", 49.506389, 6.012778));
+            clubRepository.save(placeholderClub("Schuttrange", 49.620556, 6.268611));
+            clubRepository.save(placeholderClub("Walferdange", 49.66321, 6.13224));
+            clubRepository.save(placeholderClub("Weiler-la-Tour", 49.540833, 6.200833));
         };
+    }
+
+    private static Club placeholderClub(String city, double latitude, double longitude) {
+        String tbd = "Not yet added — edit via /admin/clubs.";
+        return new Club(
+                "Badminton Club " + city, city,
+                latitude, longitude,
+                tbd, tbd, tbd, tbd, tbd, tbd, tbd);
     }
 }

@@ -20,27 +20,25 @@ function escapeHtml(value) {
     return div.innerHTML;
 }
 
-// Levels of the club house diagram (discovery_house_clean.svg), roof to foundation —
-// each maps to one Club field and keeps the same color coding as the image.
+// Levels of the club house diagram (discovery_house_clean.svg), roof to foundation.
+// Each maps to one Club field and to a fixed vertical band on the image — the
+// "ov-*" class controls where its text box sits, positioned below that band's
+// baked-in icon/title so it reads as a label under each level's heading.
 const LEVELS = [
-    { field: 'visionStrategy', cssClass: 'level-vision-strategy', title: 'Vision & Strategy' },
-    { field: 'governance', cssClass: 'level-governance', title: 'Governance' },
-    { field: 'communication', cssClass: 'level-communication', title: 'Communication' },
-    { field: 'finance', cssClass: 'level-finance', title: 'Finance' },
-    { field: 'humanResources', cssClass: 'level-human-resources', title: 'Human Resources' },
-    { field: 'clubActivities', cssClass: 'level-club-activities', title: 'Club Activities' },
-    { field: 'membership', cssClass: 'level-membership', title: 'Membership' }
+    { field: 'visionStrategy', cssClass: 'ov-vision-strategy' },
+    { field: 'governance', cssClass: 'ov-governance' },
+    { field: 'communication', cssClass: 'ov-communication' },
+    { field: 'finance', cssClass: 'ov-finance' },
+    { field: 'humanResources', cssClass: 'ov-human-resources' },
+    { field: 'clubActivities', cssClass: 'ov-club-activities' },
+    { field: 'membership', cssClass: 'ov-membership' }
 ];
 
-function levelsHtml(club) {
+function levelOverlaysHtml(club) {
     return LEVELS.map(level => {
         const text = club[level.field];
-        return `
-            <div class="club-level ${level.cssClass}">
-                <h3>${level.title}</h3>
-                <p>${text ? escapeHtml(text) : '—'}</p>
-            </div>
-        `;
+        const escaped = text ? escapeHtml(text) : '';
+        return `<div class="club-overlay ${level.cssClass}" title="${escaped}">${escaped}</div>`;
     }).join('');
 }
 
@@ -52,8 +50,10 @@ function openClubPanel(club) {
     panelContent.innerHTML = `
         <div class="club-house">
             <h2>${escapeHtml(club.name)} — ${escapeHtml(club.city)}</h2>
-            <img class="club-house-img" src="/img/discovery_house_clean.svg" alt="Club levels diagram"/>
-            ${levelsHtml(club)}
+            <div class="club-house-wrap">
+                <img class="club-house-img" src="/img/discovery_house_clean.svg" alt="Club levels diagram"/>
+                ${levelOverlaysHtml(club)}
+            </div>
         </div>
     `;
     panel.hidden = false;
@@ -63,11 +63,45 @@ panelClose.addEventListener('click', () => {
     panel.hidden = true;
 });
 
+// Clubs whose coordinates round to the same spot (e.g. several clubs in one
+// city) would otherwise stack into a single unclickable marker. Spread each
+// group evenly around a small circle so every marker stays visible and
+// clickable, without changing the underlying stored coordinates.
+function spreadOverlappingClubs(clubs) {
+    const groups = new Map();
+    clubs.forEach(club => {
+        const key = `${club.latitude.toFixed(3)},${club.longitude.toFixed(3)}`;
+        if (!groups.has(key)) {
+            groups.set(key, []);
+        }
+        groups.get(key).push(club);
+    });
+
+    const positioned = [];
+    groups.forEach(group => {
+        if (group.length === 1) {
+            const club = group[0];
+            positioned.push({ club, lat: club.latitude, lng: club.longitude });
+            return;
+        }
+        const radiusDegrees = 0.0015;
+        group.forEach((club, index) => {
+            const angle = (2 * Math.PI * index) / group.length;
+            positioned.push({
+                club,
+                lat: club.latitude + radiusDegrees * Math.cos(angle),
+                lng: club.longitude + radiusDegrees * Math.sin(angle)
+            });
+        });
+    });
+    return positioned;
+}
+
 fetch('/api/clubs')
     .then(response => response.json())
     .then(clubs => {
-        clubs.forEach(club => {
-            L.marker([club.latitude, club.longitude], { icon: houseIcon })
+        spreadOverlappingClubs(clubs).forEach(({ club, lat, lng }) => {
+            L.marker([lat, lng], { icon: houseIcon })
                 .addTo(map)
                 .on('click', () => openClubPanel(club));
         });
