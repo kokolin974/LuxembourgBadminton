@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin — Badminton Clubs</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" th:href="@{/css/style.css}"/>
+</head>
+<body>
+    <header>
+        <h1>Admin — Clubs</h1>
+        <a class="header-link" th:href="@{/}">View map</a>
+    </header>
+
+    <main class="admin">
+        <section class="admin-form">
+            <h2>Add a club</h2>
+            <!--
+                Latitude/longitude are entered by hand for now. The natural
+                next step is a "look up city" action here that geocodes the
+                city name (e.g. via the free Nominatim/OSM API) and fills
+                these two fields in automatically.
+            -->
+            <form th:action="@{/admin/clubs}" th:object="${clubForm}" method="post">
+                <label>
+                    Name
+                    <input type="text" th:field="*{name}" required/>
+                </label>
+                <label>
+                    City
+                    <input type="text" th:field="*{city}" required/>
+                </label>
+                <div class="admin-form-row">
+                    <label>
+                        Latitude
+                        <input type="number" step="any" th:field="*{latitude}" required/>
+                    </label>
+                    <label>
+                        Longitude
+                        <input type="number" step="any" th:field="*{longitude}" required/>
+                    </label>
+                </div>
+                <label>
+                    Description
+                    <textarea th:field="*{description}" rows="3"></textarea>
+                </label>
+                <label>
+                    Website
+                    <input type="url" th:field="*{website}"/>
+                </label>
+                <label>
+                    Contact email
+                    <input type="email" th:field="*{contactEmail}"/>
+                </label>
+                <button type="submit">Add club</button>
+            </form>
+        </section>
+
+        <section class="admin-list">
+            <h2>Existing clubs</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>City</th>
+                        <th>Coordinates</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="club : ${clubs}">
+                        <td th:text="${club.name}"></td>
+                        <td th:text="${club.city}"></td>
+                        <td th:text="${club.latitude} + ', ' + ${club.longitude}"></td>
+                        <td>
+                            <form th:action="@{/admin/clubs/{id}/delete(id=${club.id})}" method="post">
+                                <button type="submit" class="admin-delete">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+    </main>
+</body>
+</html>
