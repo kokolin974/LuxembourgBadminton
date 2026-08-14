@@ -1,0 +1,30 @@
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    font-family: system-ui, -apple-system, sans-serif;
+}
+
+header {
+    padding: 0.75rem 1rem;
+    background: #1f6f4d;
+    color: white;
+}
+
+header h1 {
+    margin: 0;
+    font-size: 1.25rem;
+}
+
+#map {
+    height: calc(100vh - 52px);
+    width: 100%;
+}
+
+.club-popup h3 {
+    margin: 0 0 0.25rem 0;
+}
+
+.club-popup p {
+    margin: 0.25rem 0;
+}

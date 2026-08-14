@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: badminton-map
+  profiles:
+    active: dev
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+
+server:
+  port: 8080

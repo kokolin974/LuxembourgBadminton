@@ -1,0 +1,8 @@
+# Used when running via docker-compose (SPRING_PROFILES_ACTIVE=docker)
+spring:
+  datasource:
+    url: jdbc:postgresql://db:5432/badminton
+    username: badminton
+    password: badminton
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
