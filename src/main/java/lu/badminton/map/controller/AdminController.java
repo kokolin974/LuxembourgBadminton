@@ -20,6 +20,29 @@ public class AdminController {
     public String list(Model model) {
         model.addAttribute("clubs", clubService.findAll());
         model.addAttribute("clubForm", new ClubForm());
+        model.addAttribute("editingId", null);
+        return "admin/clubs";
+    }
+
+    @GetMapping("/{id}/edit")
+    public String edit(@PathVariable Long id, Model model) {
+        Club club = clubService.findById(id);
+        ClubForm form = new ClubForm();
+        form.setName(club.getName());
+        form.setCity(club.getCity());
+        form.setLatitude(club.getLatitude());
+        form.setLongitude(club.getLongitude());
+        form.setMembership(club.getMembership());
+        form.setClubActivities(club.getClubActivities());
+        form.setHumanResources(club.getHumanResources());
+        form.setFinance(club.getFinance());
+        form.setCommunication(club.getCommunication());
+        form.setGovernance(club.getGovernance());
+        form.setVisionStrategy(club.getVisionStrategy());
+
+        model.addAttribute("clubs", clubService.findAll());
+        model.addAttribute("clubForm", form);
+        model.addAttribute("editingId", id);
         return "admin/clubs";
     }
 
@@ -37,6 +60,24 @@ public class AdminController {
                 form.getCommunication(),
                 form.getGovernance(),
                 form.getVisionStrategy()));
+        return "redirect:/admin/clubs";
+    }
+
+    @PostMapping("/{id}/update")
+    public String update(@PathVariable Long id, @ModelAttribute ClubForm form) {
+        Club existing = clubService.findById(id);
+        existing.setName(form.getName());
+        existing.setCity(form.getCity());
+        existing.setLatitude(form.getLatitude());
+        existing.setLongitude(form.getLongitude());
+        existing.setMembership(form.getMembership());
+        existing.setClubActivities(form.getClubActivities());
+        existing.setHumanResources(form.getHumanResources());
+        existing.setFinance(form.getFinance());
+        existing.setCommunication(form.getCommunication());
+        existing.setGovernance(form.getGovernance());
+        existing.setVisionStrategy(form.getVisionStrategy());
+        clubService.save(existing);
         return "redirect:/admin/clubs";
     }
 

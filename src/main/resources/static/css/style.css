@@ -131,9 +131,29 @@ header h1 {
 .club-overlay.ov-membership { top: 78.9%; color: var(--level-membership); }
 
 .admin {
-    max-width: 700px;
+    max-width: 1100px;
     margin: 1.5rem auto;
     padding: 0 1rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 2rem;
+}
+
+.admin-form {
+    flex: 1 1 420px;
+    min-width: 0;
+}
+
+.admin-list {
+    flex: 1 1 380px;
+    min-width: 0;
+    margin-top: 0;
+}
+
+@media (max-width: 850px) {
+    .admin {
+        flex-direction: column;
+    }
 }
 
 .admin h2 {
@@ -200,8 +220,10 @@ header h1 {
     background: #175939;
 }
 
-.admin-list {
-    margin-top: 2rem;
+.admin-cancel {
+    margin-left: 0.75rem;
+    font-size: 0.9rem;
+    color: #555;
 }
 
 .admin-list table {
@@ -215,6 +237,15 @@ header h1 {
     padding: 0.4rem 0.5rem;
     border-bottom: 1px solid #eee;
     font-size: 0.9rem;
+}
+
+.admin-list td a {
+    color: #1f6f4d;
+    text-decoration: none;
+}
+
+.admin-list td a:hover {
+    text-decoration: underline;
 }
 
 .admin-delete {

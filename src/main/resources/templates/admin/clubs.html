@@ -14,14 +14,15 @@
 
     <main class="admin">
         <section class="admin-form">
-            <h2>Add a club</h2>
+            <h2 th:text="${editingId != null} ? 'Edit club' : 'Add a club'"></h2>
             <!--
                 Latitude/longitude are entered by hand for now. The natural
                 next step is a "look up city" action here that geocodes the
                 city name (e.g. via the free Nominatim/OSM API) and fills
                 these two fields in automatically.
             -->
-            <form th:action="@{/admin/clubs}" th:object="${clubForm}" method="post">
+            <form th:action="${editingId != null} ? @{/admin/clubs/{id}/update(id=${editingId})} : @{/admin/clubs}"
+                  th:object="${clubForm}" method="post">
                 <label>
                     Name
                     <input type="text" th:field="*{name}" required/>
@@ -69,7 +70,8 @@
                     Vision &amp; Strategy
                     <textarea th:field="*{visionStrategy}" rows="2"></textarea>
                 </label>
-                <button type="submit">Add club</button>
+                <button type="submit" th:text="${editingId != null} ? 'Update club' : 'Add club'"></button>
+                <a th:if="${editingId != null}" th:href="@{/admin/clubs}" class="admin-cancel">Cancel</a>
             </form>
         </section>
 
@@ -86,7 +88,7 @@
                 </thead>
                 <tbody>
                     <tr th:each="club : ${clubs}">
-                        <td th:text="${club.name}"></td>
+                        <td><a th:href="@{/admin/clubs/{id}/edit(id=${club.id})}" th:text="${club.name}"></a></td>
                         <td th:text="${club.city}"></td>
                         <td th:text="${club.latitude} + ', ' + ${club.longitude}"></td>
                         <td>

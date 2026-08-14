@@ -46,7 +46,31 @@ const panel = document.getElementById('club-panel');
 const panelContent = document.getElementById('club-panel-content');
 const panelClose = document.getElementById('club-panel-close');
 
-function openClubPanel(club) {
+// Fixed for now — every club gets the same catchment radius. The plan is to
+// replace this with a per-club value (based on club size/other factors) once
+// that's modeled, at which point it'll come from the club object instead.
+const CLUB_RADIUS_METERS = 10000;
+
+let allMarkers = [];
+let influenceCircle = null;
+
+function hideOtherMarkers(selectedMarker) {
+    allMarkers.forEach(marker => {
+        if (marker !== selectedMarker && map.hasLayer(marker)) {
+            map.removeLayer(marker);
+        }
+    });
+}
+
+function showAllMarkers() {
+    allMarkers.forEach(marker => {
+        if (!map.hasLayer(marker)) {
+            marker.addTo(map);
+        }
+    });
+}
+
+function openClubPanel(club, lat, lng, marker) {
     panelContent.innerHTML = `
         <div class="club-house">
             <h2>${escapeHtml(club.name)} — ${escapeHtml(club.city)}</h2>
@@ -57,10 +81,27 @@ function openClubPanel(club) {
         </div>
     `;
     panel.hidden = false;
+
+    hideOtherMarkers(marker);
+
+    if (influenceCircle) {
+        map.removeLayer(influenceCircle);
+    }
+    influenceCircle = L.circle([lat, lng], {
+        radius: CLUB_RADIUS_METERS,
+        color: '#1f6f4d',
+        weight: 2,
+        fillOpacity: 0.08
+    }).addTo(map);
 }
 
 panelClose.addEventListener('click', () => {
     panel.hidden = true;
+    showAllMarkers();
+    if (influenceCircle) {
+        map.removeLayer(influenceCircle);
+        influenceCircle = null;
+    }
 });
 
 // Clubs whose coordinates round to the same spot (e.g. several clubs in one
@@ -100,10 +141,10 @@ function spreadOverlappingClubs(clubs) {
 fetch('/api/clubs')
     .then(response => response.json())
     .then(clubs => {
-        spreadOverlappingClubs(clubs).forEach(({ club, lat, lng }) => {
-            L.marker([lat, lng], { icon: houseIcon })
-                .addTo(map)
-                .on('click', () => openClubPanel(club));
+        allMarkers = spreadOverlappingClubs(clubs).map(({ club, lat, lng }) => {
+            const marker = L.marker([lat, lng], { icon: houseIcon }).addTo(map);
+            marker.on('click', () => openClubPanel(club, lat, lng, marker));
+            return marker;
         });
     })
     .catch(err => console.error('Failed to load clubs', err));
