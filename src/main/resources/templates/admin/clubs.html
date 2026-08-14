@@ -41,6 +41,13 @@
                         <input type="number" step="any" th:field="*{longitude}" required/>
                     </label>
                 </div>
+                <label>
+                    Club Level
+                    <select th:field="*{levelId}" required>
+                        <option th:each="lvl : ${levels}" th:value="${lvl.level}"
+                                th:text="${lvl.level} + ' - ' + ${lvl.label} + ' (' + ${lvl.radiusKm} + ' km)'"></option>
+                    </select>
+                </label>
                 <p class="admin-form-hint">One field per level of the club house, foundation to roof:</p>
                 <label class="level-membership">
                     Membership
@@ -82,6 +89,7 @@
                     <tr>
                         <th>Name</th>
                         <th>City</th>
+                        <th>Level</th>
                         <th>Coordinates</th>
                         <th></th>
                     </tr>
@@ -90,6 +98,7 @@
                     <tr th:each="club : ${clubs}">
                         <td><a th:href="@{/admin/clubs/{id}/edit(id=${club.id})}" th:text="${club.name}"></a></td>
                         <td th:text="${club.city}"></td>
+                        <td th:text="${club.level != null} ? ${club.level.label} : '—'"></td>
                         <td th:text="${club.latitude} + ', ' + ${club.longitude}"></td>
                         <td>
                             <form th:action="@{/admin/clubs/{id}/delete(id=${club.id})}" method="post">

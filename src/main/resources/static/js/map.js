@@ -7,12 +7,20 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 }).addTo(map);
 
-const houseIcon = L.icon({
-    iconUrl: '/img/house-marker.svg',
-    iconSize: [32, 32],
-    iconAnchor: [16, 32],
-    popupAnchor: [0, -28]
-});
+// Marker icon reflects the club's level (clubLevel1.png..clubLevel7.png); falls
+// back to the plain house icon if the club has no level or its image fails to load.
+const DEFAULT_ICON_URL = '/img/house-marker.svg';
+
+function iconForClub(club) {
+    const url = club.level ? `/img/clubLevel${club.level.level}.png` : DEFAULT_ICON_URL;
+    return L.divIcon({
+        html: `<img class="club-marker-img" src="${url}" onerror="this.src='${DEFAULT_ICON_URL}'"/>`,
+        className: 'club-marker-icon',
+        iconSize: [40, 40],
+        iconAnchor: [20, 40],
+        popupAnchor: [0, -36]
+    });
+}
 
 function escapeHtml(value) {
     const div = document.createElement('div');
@@ -46,10 +54,8 @@ const panel = document.getElementById('club-panel');
 const panelContent = document.getElementById('club-panel-content');
 const panelClose = document.getElementById('club-panel-close');
 
-// Fixed for now — every club gets the same catchment radius. The plan is to
-// replace this with a per-club value (based on club size/other factors) once
-// that's modeled, at which point it'll come from the club object instead.
-const CLUB_RADIUS_METERS = 10000;
+// Fallback radius for clubs with no level assigned (shouldn't normally happen).
+const DEFAULT_RADIUS_METERS = 10000;
 
 let allMarkers = [];
 let influenceCircle = null;
@@ -87,8 +93,9 @@ function openClubPanel(club, lat, lng, marker) {
     if (influenceCircle) {
         map.removeLayer(influenceCircle);
     }
+    const radiusMeters = club.level ? club.level.radiusKm * 1000 : DEFAULT_RADIUS_METERS;
     influenceCircle = L.circle([lat, lng], {
-        radius: CLUB_RADIUS_METERS,
+        radius: radiusMeters,
         color: '#1f6f4d',
         weight: 2,
         fillOpacity: 0.08
@@ -142,7 +149,7 @@ fetch('/api/clubs')
     .then(response => response.json())
     .then(clubs => {
         allMarkers = spreadOverlappingClubs(clubs).map(({ club, lat, lng }) => {
-            const marker = L.marker([lat, lng], { icon: houseIcon }).addTo(map);
+            const marker = L.marker([lat, lng], { icon: iconForClub(club) }).addTo(map);
             marker.on('click', () => openClubPanel(club, lat, lng, marker));
             return marker;
         });

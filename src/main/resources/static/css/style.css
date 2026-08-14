@@ -36,6 +36,18 @@ header h1 {
     width: 100%;
 }
 
+.club-marker-icon {
+    background: none;
+    border: none;
+}
+
+.club-marker-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
 .club-panel {
     position: fixed;
     top: 0;
@@ -175,7 +187,8 @@ header h1 {
 }
 
 .admin-form input,
-.admin-form textarea {
+.admin-form textarea,
+.admin-form select {
     padding: 0.4rem 0.5rem;
     font-size: 1rem;
     border: 1px solid #ccc;

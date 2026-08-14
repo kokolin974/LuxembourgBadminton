@@ -5,6 +5,8 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.validation.constraints.NotBlank;
 
 // One text field per level of the "club house" diagram (discovery_house_clean.svg),
@@ -49,13 +51,18 @@ public class Club {
     @Column(length = 2000)
     private String visionStrategy;
 
+    @ManyToOne
+    @JoinColumn(name = "level_id")
+    private Level level;
+
     protected Club() {
         // JPA
     }
 
     public Club(String name, String city, double latitude, double longitude,
                 String membership, String clubActivities, String humanResources,
-                String finance, String communication, String governance, String visionStrategy) {
+                String finance, String communication, String governance, String visionStrategy,
+                Level level) {
         this.name = name;
         this.city = city;
         this.latitude = latitude;
@@ -67,6 +74,7 @@ public class Club {
         this.communication = communication;
         this.governance = governance;
         this.visionStrategy = visionStrategy;
+        this.level = level;
     }
 
     public Long getId() {
@@ -159,5 +167,13 @@ public class Club {
 
     public void setVisionStrategy(String visionStrategy) {
         this.visionStrategy = visionStrategy;
+    }
+
+    public Level getLevel() {
+        return level;
+    }
+
+    public void setLevel(Level level) {
+        this.level = level;
     }
 }

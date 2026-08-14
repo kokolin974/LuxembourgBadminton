@@ -15,6 +15,7 @@ public class ClubForm {
     private String communication;
     private String governance;
     private String visionStrategy;
+    private Integer levelId;
 
     public String getName() {
         return name;
@@ -102,5 +103,13 @@ public class ClubForm {
 
     public void setVisionStrategy(String visionStrategy) {
         this.visionStrategy = visionStrategy;
+    }
+
+    public Integer getLevelId() {
+        return levelId;
+    }
+
+    public void setLevelId(Integer levelId) {
+        this.levelId = levelId;
     }
 }
