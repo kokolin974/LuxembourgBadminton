@@ -21,10 +21,98 @@ header h1 {
     width: 100%;
 }
 
-.club-popup h3 {
-    margin: 0 0 0.25rem 0;
+.club-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: min(360px, 100%);
+    background: white;
+    box-shadow: -2px 0 12px rgba(0, 0, 0, 0.2);
+    padding: 1.5rem 1.25rem;
+    box-sizing: border-box;
+    overflow-y: auto;
+    z-index: 1000;
 }
 
-.club-popup p {
+.club-panel[hidden] {
+    display: none;
+}
+
+.club-panel-close {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    width: 2rem;
+    height: 2rem;
+    border: none;
+    background: transparent;
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    color: #555;
+}
+
+.club-panel-close:hover {
+    color: #000;
+}
+
+.club-house h2 {
+    margin: 0.5rem 0 1rem 0;
+    font-size: 1.1rem;
+}
+
+.club-house svg {
+    width: 100%;
+    max-width: 260px;
+    display: block;
+    margin: 0 auto;
+}
+
+.club-house .floor {
+    cursor: pointer;
+    fill: #d9e8de;
+    stroke: #1f6f4d;
+    stroke-width: 1.5;
+    transition: fill 0.15s ease;
+}
+
+.club-house .floor:hover {
+    fill: #bfe0cc;
+}
+
+.club-house .floor.active {
+    fill: #1f6f4d;
+}
+
+.club-house .floor-label {
+    font-size: 11px;
+    fill: #333;
+    pointer-events: none;
+    user-select: none;
+}
+
+.club-floor-info {
+    margin-top: 1rem;
+    min-height: 4.5rem;
+    padding: 0.75rem;
+    background: #f4f7f5;
+    border-radius: 6px;
+}
+
+.club-floor-info h3 {
+    margin: 0 0 0.4rem 0;
+    font-size: 0.95rem;
+    color: #1f6f4d;
+}
+
+.club-floor-info p {
     margin: 0.25rem 0;
+}
+
+.club-floor-hint {
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+    color: #777;
+    text-align: center;
 }

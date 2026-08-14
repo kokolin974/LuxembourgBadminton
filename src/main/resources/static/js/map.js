@@ -14,23 +14,88 @@ const houseIcon = L.icon({
     popupAnchor: [0, -28]
 });
 
-function popupHtml(club) {
-    const website = club.website
-        ? `<p><a href="${club.website}" target="_blank" rel="noopener">Website</a></p>`
-        : '';
-    const email = club.contactEmail
-        ? `<p><a href="mailto:${club.contactEmail}">${club.contactEmail}</a></p>`
-        : '';
-    return `
-        <div class="club-popup">
-            <h3>${club.name}</h3>
-            <p>${club.city}</p>
-            <p>${club.description ?? ''}</p>
-            ${website}
-            ${email}
+function escapeHtml(value) {
+    const div = document.createElement('div');
+    div.textContent = value ?? '';
+    return div.innerHTML;
+}
+
+// Each floor of the house cross-section maps to a slice of the club's info.
+function floorsFor(club) {
+    const contactLines = [];
+    if (club.website) {
+        contactLines.push(`<a href="${escapeHtml(club.website)}" target="_blank" rel="noopener">Website</a>`);
+    }
+    if (club.contactEmail) {
+        contactLines.push(`<a href="mailto:${escapeHtml(club.contactEmail)}">${escapeHtml(club.contactEmail)}</a>`);
+    }
+
+    return {
+        roof: {
+            title: 'Club',
+            html: `<p>${escapeHtml(club.name)}</p><p>${escapeHtml(club.city)}</p>`
+        },
+        upper: {
+            title: 'About',
+            html: `<p>${escapeHtml(club.description) || 'No description yet.'}</p>`
+        },
+        ground: {
+            title: 'Contact',
+            html: contactLines.length ? contactLines.map(l => `<p>${l}</p>`).join('') : '<p>No contact info yet.</p>'
+        }
+    };
+}
+
+const HOUSE_SVG = `
+    <svg viewBox="0 0 200 220" xmlns="http://www.w3.org/2000/svg">
+        <polygon class="floor" data-floor="roof" points="20,80 100,15 180,80" />
+        <rect class="floor" data-floor="upper" x="30" y="80" width="140" height="65" />
+        <rect class="floor" data-floor="ground" x="30" y="145" width="140" height="65" />
+        <text class="floor-label" x="100" y="55" text-anchor="middle">Roof</text>
+        <text class="floor-label" x="100" y="116" text-anchor="middle">Upper floor</text>
+        <text class="floor-label" x="100" y="181" text-anchor="middle">Ground floor</text>
+    </svg>
+`;
+
+const panel = document.getElementById('club-panel');
+const panelContent = document.getElementById('club-panel-content');
+const panelClose = document.getElementById('club-panel-close');
+
+function showFloor(floors, floorKey, svgRoot, infoBox) {
+    svgRoot.querySelectorAll('.floor').forEach(el => {
+        el.classList.toggle('active', el.dataset.floor === floorKey);
+    });
+    const floor = floors[floorKey];
+    infoBox.innerHTML = `<h3>${floor.title}</h3>${floor.html}`;
+}
+
+function openClubPanel(club) {
+    const floors = floorsFor(club);
+
+    panelContent.innerHTML = `
+        <div class="club-house">
+            <h2>${escapeHtml(club.name)}</h2>
+            ${HOUSE_SVG}
+            <div class="club-floor-info" id="club-floor-info"></div>
+            <p class="club-floor-hint">Click a level of the house for more.</p>
         </div>
     `;
+
+    const svgRoot = panelContent.querySelector('svg');
+    const infoBox = panelContent.querySelector('#club-floor-info');
+
+    svgRoot.querySelectorAll('.floor').forEach(el => {
+        el.addEventListener('click', () => showFloor(floors, el.dataset.floor, svgRoot, infoBox));
+    });
+
+    showFloor(floors, 'roof', svgRoot, infoBox);
+
+    panel.hidden = false;
 }
+
+panelClose.addEventListener('click', () => {
+    panel.hidden = true;
+});
 
 fetch('/api/clubs')
     .then(response => response.json())
@@ -38,7 +103,7 @@ fetch('/api/clubs')
         clubs.forEach(club => {
             L.marker([club.latitude, club.longitude], { icon: houseIcon })
                 .addTo(map)
-                .bindPopup(popupHtml(club));
+                .on('click', () => openClubPanel(club));
         });
     })
     .catch(err => console.error('Failed to load clubs', err));
