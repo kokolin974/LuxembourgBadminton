@@ -11,14 +11,26 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 // back to the plain house icon if the club has no level or its image fails to load.
 const DEFAULT_ICON_URL = '/img/house-marker.svg';
 
-function iconForClub(club) {
+// Icon shrinks as you zoom in — at country-wide zoom a bigger icon stays
+// visible, but once you're zoomed into a small area a 40px house photo per
+// marker gets overwhelming, especially where several markers sit close
+// together. Tuned in bands rather than a continuous formula for predictability.
+function iconSizeForZoom(zoom) {
+    if (zoom <= 10) return 40;
+    if (zoom <= 12) return 32;
+    if (zoom <= 14) return 26;
+    if (zoom <= 16) return 22;
+    return 18;
+}
+
+function iconForClub(club, size) {
     const url = club.level ? `/img/clubLevel${club.level.level}.png` : DEFAULT_ICON_URL;
     return L.divIcon({
         html: `<img class="club-marker-img" src="${url}" onerror="this.src='${DEFAULT_ICON_URL}'"/>`,
         className: 'club-marker-icon',
-        iconSize: [40, 40],
-        iconAnchor: [20, 40],
-        popupAnchor: [0, -36]
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size],
+        popupAnchor: [0, -size * 0.9]
     });
 }
 
@@ -132,7 +144,9 @@ function spreadOverlappingClubs(clubs) {
             positioned.push({ club, lat: club.latitude, lng: club.longitude });
             return;
         }
-        const radiusDegrees = 0.0015;
+        // ~450m at this latitude — enough that even the largest (zoomed-out,
+        // 40px) icons don't overlap for two clubs in the same city.
+        const radiusDegrees = 0.004;
         group.forEach((club, index) => {
             const angle = (2 * Math.PI * index) / group.length;
             positioned.push({
@@ -148,10 +162,17 @@ function spreadOverlappingClubs(clubs) {
 fetch('/api/clubs')
     .then(response => response.json())
     .then(clubs => {
+        const size = iconSizeForZoom(map.getZoom());
         allMarkers = spreadOverlappingClubs(clubs).map(({ club, lat, lng }) => {
-            const marker = L.marker([lat, lng], { icon: iconForClub(club) }).addTo(map);
+            const marker = L.marker([lat, lng], { icon: iconForClub(club, size) }).addTo(map);
+            marker.club = club;
             marker.on('click', () => openClubPanel(club, lat, lng, marker));
             return marker;
         });
     })
     .catch(err => console.error('Failed to load clubs', err));
+
+map.on('zoomend', () => {
+    const size = iconSizeForZoom(map.getZoom());
+    allMarkers.forEach(marker => marker.setIcon(iconForClub(marker.club, size)));
+});
