@@ -84,10 +84,73 @@ function showAllMarkers() {
     });
 }
 
+// Radius bounds for the slider — deliberately wider than the 5-30km level
+// range, since it's an override and might reasonably need to go past it.
+const RADIUS_MIN_KM = 1;
+const RADIUS_MAX_KM = 50;
+const RADIUS_STEP_KM = 0.5;
+
+function radiusControlHtml(club) {
+    const levelDefault = club.level ? club.level.radiusKm : null;
+    const current = club.effectiveRadiusKm ?? levelDefault ?? RADIUS_MIN_KM;
+    const hasOverride = club.radiusOverrideKm != null;
+    return `
+        <div class="club-radius">
+            <label for="club-radius-slider">Radius of influence: <span id="club-radius-value">${current}</span> km</label>
+            <input type="range" id="club-radius-slider" min="${RADIUS_MIN_KM}" max="${RADIUS_MAX_KM}"
+                   step="${RADIUS_STEP_KM}" value="${current}"/>
+            <button type="button" id="club-radius-reset" class="club-radius-reset" ${hasOverride ? '' : 'hidden'}>
+                Reset to level default (${levelDefault ?? '—'} km)
+            </button>
+        </div>
+    `;
+}
+
+function saveRadius(club, radiusOverrideKm) {
+    return fetch(`/api/clubs/${club.id}/radius`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ radiusOverrideKm })
+    })
+        .then(response => response.json())
+        .then(updated => {
+            club.radiusOverrideKm = updated.radiusOverrideKm;
+            club.effectiveRadiusKm = updated.effectiveRadiusKm;
+        })
+        .catch(err => console.error('Failed to save radius', err));
+}
+
+function wireRadiusControl(club) {
+    const slider = document.getElementById('club-radius-slider');
+    const valueLabel = document.getElementById('club-radius-value');
+    const resetButton = document.getElementById('club-radius-reset');
+
+    slider.addEventListener('input', () => {
+        valueLabel.textContent = slider.value;
+    });
+
+    slider.addEventListener('change', () => {
+        const value = parseFloat(slider.value);
+        saveRadius(club, value).then(() => {
+            resetButton.hidden = false;
+        });
+    });
+
+    resetButton.addEventListener('click', () => {
+        saveRadius(club, null).then(() => {
+            const levelDefault = club.level ? club.level.radiusKm : RADIUS_MIN_KM;
+            slider.value = levelDefault;
+            valueLabel.textContent = levelDefault;
+            resetButton.hidden = true;
+        });
+    });
+}
+
 function openClubPanel(club, marker) {
     panelContent.innerHTML = `
         <div class="club-house">
             <h2>${escapeHtml(club.name)} — ${escapeHtml(club.city)}</h2>
+            ${radiusControlHtml(club)}
             <div class="club-house-wrap">
                 <img class="club-house-img" src="/img/discovery_house_clean.svg" alt="Club levels diagram"/>
                 ${levelOverlaysHtml(club)}
@@ -96,6 +159,7 @@ function openClubPanel(club, marker) {
     `;
     panel.hidden = false;
 
+    wireRadiusControl(club);
     hideOtherMarkers(marker);
 }
 
