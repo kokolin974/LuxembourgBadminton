@@ -46,6 +46,7 @@ public class AdminController {
         form.setGovernance(club.getGovernance());
         form.setVisionStrategy(club.getVisionStrategy());
         form.setLevelId(club.getLevel() != null ? club.getLevel().getLevel() : null);
+        form.setRadiusOverrideKm(club.getRadiusOverrideKm());
 
         model.addAttribute("clubs", clubService.findAll());
         model.addAttribute("levels", levelRepository.findAll(Sort.by("level")));
@@ -57,7 +58,7 @@ public class AdminController {
     @PostMapping
     public String create(@ModelAttribute ClubForm form) {
         Level level = levelRepository.findById(form.getLevelId()).orElse(null);
-        clubService.save(new Club(
+        Club club = new Club(
                 form.getName(),
                 form.getCity(),
                 form.getLatitude(),
@@ -69,7 +70,9 @@ public class AdminController {
                 form.getCommunication(),
                 form.getGovernance(),
                 form.getVisionStrategy(),
-                level));
+                level);
+        club.setRadiusOverrideKm(form.getRadiusOverrideKm());
+        clubService.save(club);
         return "redirect:/admin/clubs";
     }
 
@@ -88,6 +91,7 @@ public class AdminController {
         existing.setGovernance(form.getGovernance());
         existing.setVisionStrategy(form.getVisionStrategy());
         existing.setLevel(levelRepository.findById(form.getLevelId()).orElse(null));
+        existing.setRadiusOverrideKm(form.getRadiusOverrideKm());
         clubService.save(existing);
         return "redirect:/admin/clubs";
     }

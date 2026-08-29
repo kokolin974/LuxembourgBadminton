@@ -66,11 +66,7 @@ const panel = document.getElementById('club-panel');
 const panelContent = document.getElementById('club-panel-content');
 const panelClose = document.getElementById('club-panel-close');
 
-// Fallback radius for clubs with no level assigned (shouldn't normally happen).
-const DEFAULT_RADIUS_METERS = 10000;
-
 let allMarkers = [];
-let influenceCircle = null;
 
 function hideOtherMarkers(selectedMarker) {
     allMarkers.forEach(marker => {
@@ -88,7 +84,7 @@ function showAllMarkers() {
     });
 }
 
-function openClubPanel(club, lat, lng, marker) {
+function openClubPanel(club, marker) {
     panelContent.innerHTML = `
         <div class="club-house">
             <h2>${escapeHtml(club.name)} — ${escapeHtml(club.city)}</h2>
@@ -101,26 +97,11 @@ function openClubPanel(club, lat, lng, marker) {
     panel.hidden = false;
 
     hideOtherMarkers(marker);
-
-    if (influenceCircle) {
-        map.removeLayer(influenceCircle);
-    }
-    const radiusMeters = club.level ? club.level.radiusKm * 1000 : DEFAULT_RADIUS_METERS;
-    influenceCircle = L.circle([lat, lng], {
-        radius: radiusMeters,
-        color: '#1f6f4d',
-        weight: 2,
-        fillOpacity: 0.08
-    }).addTo(map);
 }
 
 panelClose.addEventListener('click', () => {
     panel.hidden = true;
     showAllMarkers();
-    if (influenceCircle) {
-        map.removeLayer(influenceCircle);
-        influenceCircle = null;
-    }
 });
 
 // Clubs whose coordinates round to the same spot (e.g. several clubs in one
@@ -166,7 +147,7 @@ fetch('/api/clubs')
         allMarkers = spreadOverlappingClubs(clubs).map(({ club, lat, lng }) => {
             const marker = L.marker([lat, lng], { icon: iconForClub(club, size) }).addTo(map);
             marker.club = club;
-            marker.on('click', () => openClubPanel(club, lat, lng, marker));
+            marker.on('click', () => openClubPanel(club, marker));
             return marker;
         });
     })

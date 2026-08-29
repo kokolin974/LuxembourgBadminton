@@ -55,6 +55,10 @@ public class Club {
     @JoinColumn(name = "level_id")
     private Level level;
 
+    // Overrides the level's default radius for this specific club, when set.
+    // Adjustable from the map's club panel.
+    private Double radiusOverrideKm;
+
     protected Club() {
         // JPA
     }
@@ -175,5 +179,22 @@ public class Club {
 
     public void setLevel(Level level) {
         this.level = level;
+    }
+
+    public Double getRadiusOverrideKm() {
+        return radiusOverrideKm;
+    }
+
+    public void setRadiusOverrideKm(Double radiusOverrideKm) {
+        this.radiusOverrideKm = radiusOverrideKm;
+    }
+
+    // Effective radius for map display: the per-club override if set,
+    // otherwise the level's default. Null only if the club has neither.
+    public Double getEffectiveRadiusKm() {
+        if (radiusOverrideKm != null) {
+            return radiusOverrideKm;
+        }
+        return level != null ? level.getRadiusKm() : null;
     }
 }

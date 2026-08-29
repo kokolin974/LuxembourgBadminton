@@ -275,3 +275,9 @@ header h1 {
     background: #c0392b;
     color: white;
 }
+
+.admin-radius-override {
+    font-size: 0.75rem;
+    color: #777;
+    margin-left: 0.25rem;
+}

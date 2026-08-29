@@ -16,6 +16,7 @@ public class ClubForm {
     private String governance;
     private String visionStrategy;
     private Integer levelId;
+    private Double radiusOverrideKm;
 
     public String getName() {
         return name;
@@ -111,5 +112,13 @@ public class ClubForm {
 
     public void setLevelId(Integer levelId) {
         this.levelId = levelId;
+    }
+
+    public Double getRadiusOverrideKm() {
+        return radiusOverrideKm;
+    }
+
+    public void setRadiusOverrideKm(Double radiusOverrideKm) {
+        this.radiusOverrideKm = radiusOverrideKm;
     }
 }

@@ -50,9 +50,21 @@ public class ClubController {
         return ResponseEntity.ok(clubService.save(existing));
     }
 
+    // Lightweight endpoint for the map's radius slider (club panel) — updates
+    // just the radius override without needing the full admin form payload.
+    @PatchMapping("/{id}/radius")
+    public ResponseEntity<Club> updateRadius(@PathVariable Long id, @RequestBody RadiusUpdate body) {
+        Club existing = clubService.findById(id);
+        existing.setRadiusOverrideKm(body.radiusOverrideKm());
+        return ResponseEntity.ok(clubService.save(existing));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteClub(@PathVariable Long id) {
         clubService.deleteById(id);
         return ResponseEntity.noContent().build();
+    }
+
+    public record RadiusUpdate(Double radiusOverrideKm) {
     }
 }
