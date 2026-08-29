@@ -7,6 +7,52 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 }).addTo(map);
 
+// Coverage heatmap — additive gradient built from each visible club's
+// effective radius. heatmap.js's radius is in *pixels*, not meters, but with
+// scaleRadius:true it multiplies our per-point radius by 2^zoom on every
+// redraw, which is exactly the Web Mercator relationship between a real-world
+// distance and pixel distance — so we only need to compute each point's
+// radius once, "as if at zoom 0", and the plugin keeps it geographically
+// correct at every zoom without us recomputing on zoomend. useLocalExtrema
+// auto-scales color intensity to whatever's currently in view, so overlap
+// reads as "hotter" relative to the rest of the visible map.
+const EARTH_METERS_PER_PIXEL_AT_ZOOM_0 = 156543.03392;
+
+const heatmapLayer = new HeatmapOverlay({
+    radius: 20,
+    maxOpacity: 0.6,
+    scaleRadius: true,
+    useLocalExtrema: true,
+    latField: 'lat',
+    lngField: 'lng',
+    valueField: 'value'
+});
+let heatmapVisible = false;
+
+function computeHeatPoints(clubs) {
+    return clubs
+        .filter(club => club.effectiveRadiusKm)
+        .map(club => {
+            const metersPerPixelAtZoom0 = EARTH_METERS_PER_PIXEL_AT_ZOOM_0 * Math.cos(club.latitude * Math.PI / 180);
+            const radiusAtZoom0 = (club.effectiveRadiusKm * 1000) / metersPerPixelAtZoom0;
+            return { lat: club.latitude, lng: club.longitude, value: 1, radius: radiusAtZoom0 };
+        });
+}
+
+function setHeatmapClubs(clubs) {
+    if (!heatmapVisible) {
+        return;
+    }
+    heatmapLayer.setData({ max: 1, data: computeHeatPoints(clubs) });
+}
+
+// Refreshes to whatever the level filter currently allows. When a single
+// club is isolated (marker clicked), setHeatmapClubs([club]) is used instead
+// so the heatmap matches what's actually visible on the map.
+function refreshHeatmap() {
+    setHeatmapClubs(getVisibleClubs());
+}
+
 // Marker icon reflects the club's level (clubLevel1.png..clubLevel7.png); falls
 // back to the plain house icon if the club has no level or its image fails to load.
 const DEFAULT_ICON_URL = '/img/house-marker.svg';
@@ -90,6 +136,7 @@ function applyFilter() {
             map.removeLayer(marker);
         }
     });
+    refreshHeatmap();
 }
 
 // The clubs a consumer (e.g. a coverage heatmap) should currently account
@@ -155,6 +202,7 @@ function wireRadiusControl(club) {
         const value = parseFloat(slider.value);
         saveRadius(club, value).then(() => {
             resetButton.hidden = false;
+            setHeatmapClubs([club]);
         });
     });
 
@@ -164,6 +212,7 @@ function wireRadiusControl(club) {
             slider.value = levelDefault;
             valueLabel.textContent = levelDefault;
             resetButton.hidden = true;
+            setHeatmapClubs([club]);
         });
     });
 }
@@ -183,6 +232,7 @@ function openClubPanel(club, marker) {
 
     wireRadiusControl(club);
     hideOtherMarkers(marker);
+    setHeatmapClubs([club]);
 }
 
 panelClose.addEventListener('click', () => {
@@ -231,7 +281,7 @@ const levelFilter = document.getElementById('level-filter');
 function renderLevelFilter(levels) {
     const checkboxes = levels.map(level => `
         <label>
-            <input type="checkbox" value="${level.level}" checked/>
+            <input type="checkbox" class="level-filter-checkbox" value="${level.level}" checked/>
             ${level.level} - ${escapeHtml(level.label)}
         </label>
     `).join('');
@@ -242,9 +292,23 @@ function renderLevelFilter(levels) {
             <button type="button" id="level-filter-all">All</button>
             <button type="button" id="level-filter-none">None</button>
         </div>
+        <label class="heatmap-toggle-label">
+            <input type="checkbox" id="heatmap-toggle"/>
+            Show coverage
+        </label>
     `;
 
-    levelFilter.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+    document.getElementById('heatmap-toggle').addEventListener('change', event => {
+        heatmapVisible = event.target.checked;
+        if (heatmapVisible) {
+            heatmapLayer.addTo(map);
+            refreshHeatmap();
+        } else {
+            map.removeLayer(heatmapLayer);
+        }
+    });
+
+    levelFilter.querySelectorAll('.level-filter-checkbox').forEach(checkbox => {
         checkbox.addEventListener('change', () => {
             const value = parseInt(checkbox.value, 10);
             if (checkbox.checked) {
@@ -258,13 +322,13 @@ function renderLevelFilter(levels) {
 
     document.getElementById('level-filter-all').addEventListener('click', () => {
         selectedLevels = new Set(levels.map(level => level.level));
-        levelFilter.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = true; });
+        levelFilter.querySelectorAll('.level-filter-checkbox').forEach(cb => { cb.checked = true; });
         applyFilter();
     });
 
     document.getElementById('level-filter-none').addEventListener('click', () => {
         selectedLevels = new Set();
-        levelFilter.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = false; });
+        levelFilter.querySelectorAll('.level-filter-checkbox').forEach(cb => { cb.checked = false; });
         applyFilter();
     });
 }

@@ -81,6 +81,18 @@ header h1 {
     text-decoration: underline;
 }
 
+.heatmap-toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.6rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #ddd;
+    font-weight: 600;
+    color: #1f6f4d;
+    cursor: pointer;
+}
+
 .club-marker-icon {
     background: none;
     border: none;
