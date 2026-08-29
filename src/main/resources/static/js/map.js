@@ -68,18 +68,40 @@ const panelClose = document.getElementById('club-panel-close');
 
 let allMarkers = [];
 
-function hideOtherMarkers(selectedMarker) {
+// Levels currently checked in the filter box. A marker is only ever on the
+// map if its club's level is in this set — clicking a marker to isolate it
+// temporarily overrides that (hiding the rest), but closing the panel goes
+// back through applyFilter() rather than blindly re-showing everyone, so
+// filtered-out clubs stay hidden.
+let selectedLevels = new Set();
+
+function markerPassesFilter(marker) {
+    const level = marker.club.level;
+    return !level || selectedLevels.has(level.level);
+}
+
+function applyFilter() {
     allMarkers.forEach(marker => {
-        if (marker !== selectedMarker && map.hasLayer(marker)) {
+        const shouldShow = markerPassesFilter(marker);
+        const isShown = map.hasLayer(marker);
+        if (shouldShow && !isShown) {
+            marker.addTo(map);
+        } else if (!shouldShow && isShown) {
             map.removeLayer(marker);
         }
     });
 }
 
-function showAllMarkers() {
+// The clubs a consumer (e.g. a coverage heatmap) should currently account
+// for — respects the level filter, but not a temporary marker-isolation view.
+function getVisibleClubs() {
+    return allMarkers.filter(markerPassesFilter).map(marker => marker.club);
+}
+
+function hideOtherMarkers(selectedMarker) {
     allMarkers.forEach(marker => {
-        if (!map.hasLayer(marker)) {
-            marker.addTo(map);
+        if (marker !== selectedMarker && map.hasLayer(marker)) {
+            map.removeLayer(marker);
         }
     });
 }
@@ -165,7 +187,7 @@ function openClubPanel(club, marker) {
 
 panelClose.addEventListener('click', () => {
     panel.hidden = true;
-    showAllMarkers();
+    applyFilter();
 });
 
 // Clubs whose coordinates round to the same spot (e.g. several clubs in one
@@ -204,9 +226,57 @@ function spreadOverlappingClubs(clubs) {
     return positioned;
 }
 
-fetch('/api/clubs')
-    .then(response => response.json())
-    .then(clubs => {
+const levelFilter = document.getElementById('level-filter');
+
+function renderLevelFilter(levels) {
+    const checkboxes = levels.map(level => `
+        <label>
+            <input type="checkbox" value="${level.level}" checked/>
+            ${level.level} - ${escapeHtml(level.label)}
+        </label>
+    `).join('');
+    levelFilter.innerHTML = `
+        <h3>Filter by level</h3>
+        ${checkboxes}
+        <div class="level-filter-actions">
+            <button type="button" id="level-filter-all">All</button>
+            <button type="button" id="level-filter-none">None</button>
+        </div>
+    `;
+
+    levelFilter.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+        checkbox.addEventListener('change', () => {
+            const value = parseInt(checkbox.value, 10);
+            if (checkbox.checked) {
+                selectedLevels.add(value);
+            } else {
+                selectedLevels.delete(value);
+            }
+            applyFilter();
+        });
+    });
+
+    document.getElementById('level-filter-all').addEventListener('click', () => {
+        selectedLevels = new Set(levels.map(level => level.level));
+        levelFilter.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = true; });
+        applyFilter();
+    });
+
+    document.getElementById('level-filter-none').addEventListener('click', () => {
+        selectedLevels = new Set();
+        levelFilter.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = false; });
+        applyFilter();
+    });
+}
+
+Promise.all([
+    fetch('/api/levels').then(response => response.json()),
+    fetch('/api/clubs').then(response => response.json())
+])
+    .then(([levels, clubs]) => {
+        selectedLevels = new Set(levels.map(level => level.level));
+        renderLevelFilter(levels);
+
         const size = iconSizeForZoom(map.getZoom());
         allMarkers = spreadOverlappingClubs(clubs).map(({ club, lat, lng }) => {
             const marker = L.marker([lat, lng], { icon: iconForClub(club, size) }).addTo(map);
@@ -215,7 +285,7 @@ fetch('/api/clubs')
             return marker;
         });
     })
-    .catch(err => console.error('Failed to load clubs', err));
+    .catch(err => console.error('Failed to load clubs/levels', err));
 
 map.on('zoomend', () => {
     const size = iconSizeForZoom(map.getZoom());

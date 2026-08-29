@@ -36,6 +36,51 @@ header h1 {
     width: 100%;
 }
 
+.level-filter {
+    position: fixed;
+    top: 62px;
+    right: 12px;
+    z-index: 900;
+    background: rgba(255, 255, 255, 0.92);
+    border-radius: 6px;
+    padding: 0.6rem 0.75rem;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+    font-size: 0.85rem;
+    max-width: 220px;
+}
+
+.level-filter h3 {
+    margin: 0 0 0.4rem 0;
+    font-size: 0.8rem;
+    color: #1f6f4d;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.level-filter label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.15rem 0;
+    cursor: pointer;
+}
+
+.level-filter-actions {
+    margin-top: 0.4rem;
+    display: flex;
+    gap: 0.6rem;
+}
+
+.level-filter-actions button {
+    background: none;
+    border: none;
+    color: #1f6f4d;
+    font-size: 0.78rem;
+    cursor: pointer;
+    padding: 0;
+    text-decoration: underline;
+}
+
 .club-marker-icon {
     background: none;
     border: none;
