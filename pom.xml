@@ -53,6 +53,13 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- CSV parsing for the club data import (DataSeeder) -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-csv</artifactId>
+            <version>1.11.0</version>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-devtools</artifactId>

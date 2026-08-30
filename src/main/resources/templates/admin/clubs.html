@@ -53,6 +53,14 @@
                     <input type="number" step="any" th:field="*{radiusOverrideKm}"
                            placeholder="Leave blank to use the level's default"/>
                 </label>
+                <label>
+                    Filière
+                    <select th:field="*{filiere}">
+                        <option value="">—</option>
+                        <option value="Performance">Performance</option>
+                        <option value="Active for life">Active for life</option>
+                    </select>
+                </label>
                 <p class="admin-form-hint">One field per level of the club house, foundation to roof:</p>
                 <label class="level-membership">
                     Membership
@@ -95,6 +103,7 @@
                         <th>Name</th>
                         <th>City</th>
                         <th>Level</th>
+                        <th>Filière</th>
                         <th>Radius</th>
                         <th>Coordinates</th>
                         <th></th>
@@ -105,6 +114,7 @@
                         <td><a th:href="@{/admin/clubs/{id}/edit(id=${club.id})}" th:text="${club.name}"></a></td>
                         <td th:text="${club.city}"></td>
                         <td th:text="${club.level != null} ? ${club.level.label} : '—'"></td>
+                        <td th:text="${club.filiere != null and !club.filiere.isEmpty()} ? ${club.filiere} : '—'"></td>
                         <td>
                             <span th:text="${club.effectiveRadiusKm} + ' km'"></span>
                             <span th:if="${club.radiusOverrideKm != null}" class="admin-radius-override">(override)</span>

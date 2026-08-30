@@ -59,6 +59,10 @@ public class Club {
     // Adjustable from the map's club panel.
     private Double radiusOverrideKm;
 
+    // Performance / Active for life. Plain picklist attribute — no computed
+    // behavior depends on it, unlike level (which drives icon/radius).
+    private String filiere;
+
     protected Club() {
         // JPA
     }
@@ -196,5 +200,13 @@ public class Club {
             return radiusOverrideKm;
         }
         return level != null ? level.getRadiusKm() : null;
+    }
+
+    public String getFiliere() {
+        return filiere;
+    }
+
+    public void setFiliere(String filiere) {
+        this.filiere = filiere;
     }
 }

@@ -47,6 +47,7 @@ public class AdminController {
         form.setVisionStrategy(club.getVisionStrategy());
         form.setLevelId(club.getLevel() != null ? club.getLevel().getLevel() : null);
         form.setRadiusOverrideKm(club.getRadiusOverrideKm());
+        form.setFiliere(club.getFiliere());
 
         model.addAttribute("clubs", clubService.findAll());
         model.addAttribute("levels", levelRepository.findAll(Sort.by("level")));
@@ -72,6 +73,7 @@ public class AdminController {
                 form.getVisionStrategy(),
                 level);
         club.setRadiusOverrideKm(form.getRadiusOverrideKm());
+        club.setFiliere(form.getFiliere());
         clubService.save(club);
         return "redirect:/admin/clubs";
     }
@@ -92,6 +94,7 @@ public class AdminController {
         existing.setVisionStrategy(form.getVisionStrategy());
         existing.setLevel(levelRepository.findById(form.getLevelId()).orElse(null));
         existing.setRadiusOverrideKm(form.getRadiusOverrideKm());
+        existing.setFiliere(form.getFiliere());
         clubService.save(existing);
         return "redirect:/admin/clubs";
     }

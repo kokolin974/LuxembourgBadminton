@@ -47,6 +47,7 @@ public class ClubController {
         existing.setGovernance(updated.getGovernance());
         existing.setVisionStrategy(updated.getVisionStrategy());
         existing.setLevel(updated.getLevel());
+        existing.setFiliere(updated.getFiliere());
         return ResponseEntity.ok(clubService.save(existing));
     }
 

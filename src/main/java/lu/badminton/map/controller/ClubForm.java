@@ -17,6 +17,7 @@ public class ClubForm {
     private String visionStrategy;
     private Integer levelId;
     private Double radiusOverrideKm;
+    private String filiere;
 
     public String getName() {
         return name;
@@ -120,5 +121,13 @@ public class ClubForm {
 
     public void setRadiusOverrideKm(Double radiusOverrideKm) {
         this.radiusOverrideKm = radiusOverrideKm;
+    }
+
+    public String getFiliere() {
+        return filiere;
+    }
+
+    public void setFiliere(String filiere) {
+        this.filiere = filiere;
     }
 }
