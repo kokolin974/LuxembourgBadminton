@@ -7,43 +7,300 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 }).addTo(map);
 
-// Coverage heatmap — additive gradient built from each visible club's
-// effective radius. heatmap.js's radius is in *pixels*, not meters, but with
-// scaleRadius:true it multiplies our per-point radius by 2^zoom on every
-// redraw, which is exactly the Web Mercator relationship between a real-world
-// distance and pixel distance — so we only need to compute each point's
-// radius once, "as if at zoom 0", and the plugin keeps it geographically
-// correct at every zoom without us recomputing on zoomend. useLocalExtrema
-// auto-scales color intensity to whatever's currently in view, so overlap
-// reads as "hotter" relative to the rest of the visible map.
+// Coverage overlay — hand-rolled canvas layer (heatmap.js was dropped for
+// this: its point rendering blends overlapping circles via ordinary alpha
+// compositing, not true addition, so a location's calculated overlap count
+// never matched what it actually painted, and calibrating against it either
+// washed everything out or depended on the current pan/zoom). This layer
+// draws flat, uniform-weight disks with the canvas's 'lighter' composite
+// mode, which really does add channel values together — so the summed
+// density at a pixel is an exact count of how many visible clubs cover it,
+// which is exactly what computeMaxOverlapDepth (below) calculates. Rendering
+// and calibration can't disagree because they're the same model.
 const EARTH_METERS_PER_PIXEL_AT_ZOOM_0 = 156543.03392;
 
-const heatmapLayer = new HeatmapOverlay({
-    radius: 20,
-    maxOpacity: 0.6,
-    scaleRadius: true,
-    useLocalExtrema: true,
-    latField: 'lat',
-    lngField: 'lng',
-    valueField: 'value'
-});
-let heatmapVisible = false;
+// Tune this to control how soft/smooth the gradient looks — larger is
+// smoother (more blur/bleed inside each club's true boundary), smaller is
+// crisper. Independent of the clip step below, which stops it from bleeding
+// *past* that boundary regardless of how large this is.
+const COVERAGE_BLUR_PX = 8;
+const COVERAGE_MAX_OPACITY = 0.9;
 
-function computeHeatPoints(clubs) {
-    return clubs
-        .filter(club => club.effectiveRadiusKm)
-        .map(club => {
-            const metersPerPixelAtZoom0 = EARTH_METERS_PER_PIXEL_AT_ZOOM_0 * Math.cos(club.latitude * Math.PI / 180);
-            const radiusAtZoom0 = (club.effectiveRadiusKm * 1000) / metersPerPixelAtZoom0;
-            return { lat: club.latitude, lng: club.longitude, value: 1, radius: radiusAtZoom0 };
-        });
+// Response curve from raw density ratio (0..1) to visual intensity — see the
+// comment where this is applied, below. 1.0 = linear (the original, too-flat
+// result); lower values push low/mid overlap counts further up the gradient.
+const COVERAGE_INTENSITY_CURVE = 0.5;
+
+// Blue -> light blue -> green -> yellow -> red, evenly spaced across the
+// 0..1 normalized density range (density / calibrated max).
+const COVERAGE_GRADIENT_STOPS = [
+    { stop: 0.0, color: [33, 102, 172] },
+    { stop: 0.35, color: [103, 169, 207] },
+    { stop: 0.55, color: [116, 196, 118] },
+    { stop: 0.75, color: [254, 224, 144] },
+    { stop: 1.0, color: [215, 48, 39] }
+];
+
+function colorForDensity(t) {
+    const stops = COVERAGE_GRADIENT_STOPS;
+    for (let i = 0; i < stops.length - 1; i++) {
+        const a = stops[i];
+        const b = stops[i + 1];
+        if (t >= a.stop && t <= b.stop) {
+            const localT = (t - a.stop) / (b.stop - a.stop);
+            return [
+                Math.round(a.color[0] + (b.color[0] - a.color[0]) * localT),
+                Math.round(a.color[1] + (b.color[1] - a.color[1]) * localT),
+                Math.round(a.color[2] + (b.color[2] - a.color[2]) * localT)
+            ];
+        }
+    }
+    return stops[stops.length - 1].color;
 }
+
+const CoverageLayer = L.Layer.extend({
+    initialize: function () {
+        this._el = L.DomUtil.create('div', 'leaflet-zoom-hide coverage-layer');
+        this._clubs = [];
+    },
+
+    onAdd: function (map) {
+        this._map = map;
+        const size = map.getSize();
+
+        // Offscreen working canvases: raw additive density, then colorized
+        // (still unblurred/unclipped). Only the final canvas is visible.
+        this._densityCanvas = document.createElement('canvas');
+        this._colorCanvas = document.createElement('canvas');
+        this._canvas = L.DomUtil.create('canvas', '', this._el);
+        this._resizeCanvases(size);
+
+        this._el.style.position = 'absolute';
+        this._el.style.top = '0';
+        this._el.style.left = '0';
+        this._el.style.width = size.x + 'px';
+        this._el.style.height = size.y + 'px';
+        map.getPanes().overlayPane.appendChild(this._el);
+        map.on('moveend', this._reset, this);
+        this._reset();
+    },
+
+    onRemove: function (map) {
+        map.getPanes().overlayPane.removeChild(this._el);
+        map.off('moveend', this._reset, this);
+    },
+
+    addTo: function (map) {
+        map.addLayer(this);
+        return this;
+    },
+
+    setClubs: function (clubs) {
+        this._clubs = clubs;
+        this._draw();
+    },
+
+    _resizeCanvases: function (size) {
+        this._densityCanvas.width = this._colorCanvas.width = this._canvas.width = size.x;
+        this._densityCanvas.height = this._colorCanvas.height = this._canvas.height = size.y;
+    },
+
+    _reset: function () {
+        // Cancels out the overlay pane's own pan/zoom transform so this
+        // layer's container stays aligned with the container-pixel
+        // coordinates we draw with (same technique Leaflet plugins use).
+        const mapPane = this._map.getPanes().mapPane;
+        const point = (mapPane && mapPane._leaflet_pos) || { x: 0, y: 0 };
+        this._el.style.transform = `translate(${-Math.round(point.x)}px, ${-Math.round(point.y)}px)`;
+
+        const size = this._map.getSize();
+        if (this._canvas.width !== size.x || this._canvas.height !== size.y) {
+            this._resizeCanvases(size);
+            this._el.style.width = size.x + 'px';
+            this._el.style.height = size.y + 'px';
+        }
+        this._draw();
+    },
+
+    _draw: function () {
+        if (!this._map) {
+            return;
+        }
+        const width = this._canvas.width;
+        const height = this._canvas.height;
+        const ctx = this._canvas.getContext('2d');
+        ctx.clearRect(0, 0, width, height);
+
+        const clubs = this._clubs.filter(club => club.effectiveRadiusKm);
+        if (clubs.length === 0) {
+            return;
+        }
+
+        // Calibrated from ALL clubs, not just the ones currently drawn — so a
+        // given spot's color means the same thing regardless of what the
+        // level filter or isolation view currently shows. The tradeoff
+        // (explicit product decision): filtering down to a handful of clubs
+        // won't use the full color range, since their overlap can never
+        // approach the country-wide peak. Recomputed on every draw so a
+        // radius change is reflected immediately, but never affected by
+        // which clubs are filtered/isolated — only by allMarkers itself.
+        const peakOverlap = computeMaxOverlapDepth(allMarkers.map(marker => marker.club));
+        // Headroom above the true peak, per product decision: without it,
+        // the single most-overlapped spot would render as pure max-color,
+        // indistinguishable from "almost as covered" areas.
+        const OVERLAP_HEADROOM = 1;
+        const calibratedMax = Math.max(1, peakOverlap + OVERLAP_HEADROOM);
+        const perClubAlpha = 1 / calibratedMax;
+
+        // Project to the current on-screen circle (center + pixel radius) —
+        // the only part of this routine that depends on zoom/pan; calibration
+        // above never does.
+        const circles = clubs.map(club => {
+            const point = this._map.latLngToContainerPoint([club.latitude, club.longitude]);
+            const metersPerPixel = EARTH_METERS_PER_PIXEL_AT_ZOOM_0
+                * Math.cos(club.latitude * Math.PI / 180) / Math.pow(2, this._map.getZoom());
+            const radiusPx = (club.effectiveRadiusKm * 1000) / metersPerPixel;
+            return { x: point.x, y: point.y, radius: radiusPx };
+        });
+
+        // 1) Density pass: flat disks, true additive blending, so overlap is
+        // an exact count (scaled to 0..1 by calibratedMax).
+        const densityCtx = this._densityCanvas.getContext('2d');
+        densityCtx.clearRect(0, 0, width, height);
+        densityCtx.globalCompositeOperation = 'lighter';
+        densityCtx.fillStyle = `rgba(0, 0, 0, ${perClubAlpha})`;
+        circles.forEach(c => {
+            densityCtx.beginPath();
+            densityCtx.arc(c.x, c.y, c.radius, 0, 2 * Math.PI);
+            densityCtx.fill();
+        });
+        densityCtx.globalCompositeOperation = 'source-over';
+
+        // 2) Colorize pass: map each pixel's density through the gradient,
+        // onto a separate offscreen canvas (still unblurred/unclipped).
+        const densityData = densityCtx.getImageData(0, 0, width, height);
+        const colorCtx = this._colorCanvas.getContext('2d');
+        const colorImage = colorCtx.createImageData(width, height);
+        for (let i = 0; i < densityData.data.length; i += 4) {
+            const density = Math.min(1, densityData.data[i + 3] / 255);
+            if (density <= 0) {
+                continue;
+            }
+            // A straight linear density/max mapping made almost the whole map
+            // look faded: with the true country-wide peak far higher than the
+            // typical local overlap count, most areas only ever reach a small
+            // fraction of max and read as barely-there. Applying a curve here
+            // (sqrt = COVERAGE_INTENSITY_CURVE of 0.5) boosts low-to-mid
+            // overlap counts well above their raw linear share while the true
+            // peak still ends up brightest — "more overlap = more intense"
+            // stays true, just compressed less harshly at the low end.
+            const intensity = Math.pow(density, COVERAGE_INTENSITY_CURVE);
+            const [r, g, b] = colorForDensity(intensity);
+            colorImage.data[i] = r;
+            colorImage.data[i + 1] = g;
+            colorImage.data[i + 2] = b;
+            colorImage.data[i + 3] = Math.round(intensity * COVERAGE_MAX_OPACITY * 255);
+        }
+        colorCtx.putImageData(colorImage, 0, 0);
+
+        // 3) Final pass: clip to the true (unblurred) circle shapes, then
+        // draw the colorized layer through a blur — clipping happens on the
+        // destination, so nothing can paint past a club's actual radius no
+        // matter how far the blur would otherwise spread it.
+        ctx.save();
+        ctx.beginPath();
+        circles.forEach(c => {
+            ctx.moveTo(c.x + c.radius, c.y);
+            ctx.arc(c.x, c.y, c.radius, 0, 2 * Math.PI);
+        });
+        ctx.clip();
+        ctx.filter = `blur(${COVERAGE_BLUR_PX}px)`;
+        ctx.drawImage(this._colorCanvas, 0, 0);
+        ctx.filter = 'none';
+        ctx.restore();
+    }
+});
+
+// Projects lat/lng to flat local meters around a reference point. Luxembourg
+// is small enough that this equirectangular approximation is accurate enough
+// for comparing distances/radii — it's only used to find the overlap peak,
+// not for anything geographic that gets drawn.
+function projectToMeters(lat, lng, refLat, refLng) {
+    const metersPerDegLat = 111320;
+    const metersPerDegLng = 111320 * Math.cos(refLat * Math.PI / 180);
+    return {
+        x: (lng - refLng) * metersPerDegLng,
+        y: (lat - refLat) * metersPerDegLat
+    };
+}
+
+// Returns the 0, 1, or 2 points (in the same local-meters space as the
+// circles) where two circles' boundaries cross, or [] if they don't
+// intersect (too far apart, or one fully contains the other).
+function circleIntersections(c1, c2) {
+    const dx = c2.x - c1.x;
+    const dy = c2.y - c1.y;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    if (d === 0 || d > c1.radius + c2.radius || d < Math.abs(c1.radius - c2.radius)) {
+        return [];
+    }
+    const a = (c1.radius * c1.radius - c2.radius * c2.radius + d * d) / (2 * d);
+    const h = Math.sqrt(Math.max(0, c1.radius * c1.radius - a * a));
+    const xm = c1.x + (a * dx) / d;
+    const ym = c1.y + (a * dy) / d;
+    const rx = -dy * (h / d);
+    const ry = dx * (h / d);
+    return [
+        { x: xm + rx, y: ym + ry },
+        { x: xm - rx, y: ym - ry }
+    ];
+}
+
+// The true peak overlap depth of a set of circles always occurs either at
+// one circle's own center, or at a point where two circle boundaries cross —
+// coverage depth is constant in between such points, so testing just those
+// candidates finds the exact peak without scanning the whole map.
+function computeMaxOverlapDepth(clubs) {
+    const withRadius = clubs.filter(club => club.effectiveRadiusKm);
+    if (withRadius.length === 0) {
+        return 0;
+    }
+
+    const refLat = withRadius.reduce((sum, c) => sum + c.latitude, 0) / withRadius.length;
+    const refLng = withRadius.reduce((sum, c) => sum + c.longitude, 0) / withRadius.length;
+    const circles = withRadius.map(club => {
+        const p = projectToMeters(club.latitude, club.longitude, refLat, refLng);
+        return { x: p.x, y: p.y, radius: club.effectiveRadiusKm * 1000 };
+    });
+
+    const candidates = circles.map(c => ({ x: c.x, y: c.y }));
+    for (let i = 0; i < circles.length; i++) {
+        for (let j = i + 1; j < circles.length; j++) {
+            candidates.push(...circleIntersections(circles[i], circles[j]));
+        }
+    }
+
+    const EPSILON_METERS = 0.5; // tolerance for candidates that sit exactly on a circle's boundary
+    let maxDepth = 0;
+    candidates.forEach(point => {
+        const depth = circles.filter(c => {
+            const dx = point.x - c.x;
+            const dy = point.y - c.y;
+            return Math.sqrt(dx * dx + dy * dy) <= c.radius + EPSILON_METERS;
+        }).length;
+        maxDepth = Math.max(maxDepth, depth);
+    });
+    return maxDepth;
+}
+
+const coverageLayer = new CoverageLayer();
+let heatmapVisible = false;
 
 function setHeatmapClubs(clubs) {
     if (!heatmapVisible) {
         return;
     }
-    heatmapLayer.setData({ max: 1, data: computeHeatPoints(clubs) });
+    coverageLayer.setClubs(clubs);
 }
 
 // Refreshes to whatever the level filter currently allows. When a single
@@ -301,10 +558,10 @@ function renderLevelFilter(levels) {
     document.getElementById('heatmap-toggle').addEventListener('change', event => {
         heatmapVisible = event.target.checked;
         if (heatmapVisible) {
-            heatmapLayer.addTo(map);
+            coverageLayer.addTo(map);
             refreshHeatmap();
         } else {
-            map.removeLayer(heatmapLayer);
+            map.removeLayer(coverageLayer);
         }
     });
 

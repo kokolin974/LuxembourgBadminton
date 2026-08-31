@@ -98,6 +98,10 @@ header h1 {
     border: none;
 }
 
+.coverage-layer {
+    pointer-events: none;
+}
+
 .club-marker-img {
     width: 100%;
     height: 100%;
