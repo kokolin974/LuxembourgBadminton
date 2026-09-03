@@ -2,8 +2,10 @@ package lu.badminton.map.config;
 
 import lu.badminton.map.model.Club;
 import lu.badminton.map.model.Level;
+import lu.badminton.map.model.ScheduleSlot;
 import lu.badminton.map.repository.ClubRepository;
 import lu.badminton.map.repository.LevelRepository;
+import lu.badminton.map.repository.ScheduleSlotRepository;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
@@ -16,16 +18,21 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Configuration
 public class DataSeeder {
 
     private static final String CLUBS_CSV_PATH = "import/clubs_import.csv";
+    private static final String SCHEDULES_CSV_PATH = "import/schedules_import.csv";
 
     @Bean
-    CommandLineRunner seedData(ClubRepository clubRepository, LevelRepository levelRepository) {
+    CommandLineRunner seedData(ClubRepository clubRepository, LevelRepository levelRepository,
+                                ScheduleSlotRepository scheduleSlotRepository) {
         return args -> {
             if (levelRepository.count() == 0) {
                 levelRepository.save(new Level(1, "Découverte", 5));
@@ -37,10 +44,13 @@ public class DataSeeder {
                 levelRepository.save(new Level(7, "Platine", 30));
             }
 
-            if (clubRepository.count() > 0) {
-                return;
+            if (clubRepository.count() == 0) {
+                importClubsFromCsv(clubRepository, levelRepository);
             }
-            importClubsFromCsv(clubRepository, levelRepository);
+
+            if (scheduleSlotRepository.count() == 0) {
+                importScheduleFromCsv(clubRepository, scheduleSlotRepository);
+            }
         };
     }
 
@@ -84,31 +94,68 @@ public class DataSeeder {
         }
     }
 
+    // Reads import/schedules_import.csv (clubName, dayOfWeek, startTime,
+    // endTime — one row per recurring weekly session) and links each row to
+    // the matching Club by exact name match against what importClubsFromCsv
+    // already created.
+    private static void importScheduleFromCsv(ClubRepository clubRepository,
+                                                ScheduleSlotRepository scheduleSlotRepository) throws IOException {
+        ClassPathResource resource = new ClassPathResource(SCHEDULES_CSV_PATH);
+        CSVFormat format = CSVFormat.DEFAULT.builder().setHeader().setSkipHeaderRecord(true).build();
+
+        Map<String, Club> clubsByName = clubRepository.findAll().stream()
+                .collect(Collectors.toMap(Club::getName, club -> club));
+
+        try (Reader reader = new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8);
+             CSVParser parser = format.parse(reader)) {
+
+            for (CSVRecord record : parser) {
+                Club club = clubsByName.get(record.get("clubName"));
+                if (club == null) {
+                    continue;
+                }
+                ScheduleSlot slot = new ScheduleSlot(
+                        club,
+                        record.get("dayOfWeek"),
+                        LocalTime.parse(record.get("startTime")),
+                        LocalTime.parse(record.get("endTime")),
+                        null); // no label data in the source schedule tables
+                scheduleSlotRepository.save(slot);
+            }
+        }
+    }
+
+    // Each of these returns one fact per line (newline-separated) rather than
+    // a single run-on sentence — the map panel renders multi-line text as a
+    // bullet list, and a plain textarea already edits newlines fine from the
+    // admin page, so this is the one shared format both use.
+
     private static String membershipText(String licencesJeunes, String licencesTotal) {
-        return licencesJeunes + " youth licences, " + licencesTotal + " licences total.";
+        return licencesJeunes + " youth licences\n" + licencesTotal + " licences total";
     }
 
     private static String clubActivitiesText(String jeuneTeams, String seniorTeams, String cadresTotal) {
-        return jeuneTeams + " youth interclub team(s), " + seniorTeams + " senior interclub team(s), "
-                + cadresTotal + " total cadre members.";
+        return jeuneTeams + " youth interclub team(s)\n" + seniorTeams + " senior interclub team(s)\n"
+                + cadresTotal + " total cadre members";
     }
 
     private static String humanResourcesText(String responsable, String entraineur, String officiel) {
-        StringBuilder text = new StringBuilder("Manager: ").append(responsable).append(".");
+        List<String> lines = new ArrayList<>();
+        lines.add("Manager: " + responsable);
         if (!isBlank(entraineur)) {
-            text.append(" Coach(es): ").append(entraineur).append(".");
+            lines.add("Coach(es): " + entraineur);
         }
         if (!isBlank(officiel)) {
-            text.append(" Technical officials: ").append(officiel).append(".");
+            lines.add("Technical officials: " + officiel);
         }
-        return text.toString();
+        return String.join("\n", lines);
     }
 
     private static String financeText(String jeune, String adulte, String hobby) {
         if (isBlank(jeune) && isBlank(adulte) && isBlank(hobby)) {
-            return "Membership fees not published.";
+            return "Membership fees not published";
         }
-        return "Youth: €" + jeune + ", Adult: €" + adulte + ", Hobby: €" + hobby + ".";
+        return "Youth: €" + jeune + "\nAdult: €" + adulte + "\nHobby: €" + hobby;
     }
 
     private static String communicationText(boolean email, boolean website, boolean instagram, boolean facebook) {
@@ -118,45 +165,33 @@ public class DataSeeder {
         if (instagram) present.add("Instagram");
         if (facebook) present.add("Facebook");
         if (present.isEmpty()) {
-            return "No contact channels on file.";
+            return "No contact channels on file";
         }
 
-        StringBuilder text = new StringBuilder("Reachable by ").append(String.join(", ", present)).append(".");
+        List<String> lines = new ArrayList<>();
+        lines.add("Available: " + String.join(", ", present));
         List<String> missing = new ArrayList<>();
         if (!website) missing.add("website");
         if (!instagram) missing.add("Instagram");
         if (!facebook) missing.add("Facebook");
         if (!missing.isEmpty()) {
-            text.append(" No ").append(joinWithOr(missing)).append(".");
+            lines.add("Not available: " + String.join(", ", missing));
         }
-        return text.toString();
-    }
-
-    private static String joinWithOr(List<String> items) {
-        if (items.size() == 1) {
-            return items.get(0);
-        }
-        if (items.size() == 2) {
-            return items.get(0) + " or " + items.get(1);
-        }
-        return String.join(", ", items.subList(0, items.size() - 1)) + ", or " + items.get(items.size() - 1);
+        return String.join("\n", lines);
     }
 
     private static String governanceText(String levelOld, String filiere, String levelNew) {
         if (isBlank(levelNew)) {
-            return "Classification not yet assigned.";
+            return "Classification not yet assigned";
         }
-        StringBuilder text = new StringBuilder("Classified as ").append(levelNew);
-        if (!isBlank(filiere)) {
-            text.append(" (").append(filiere).append(" pathway)");
-        }
-        text.append(".");
+        List<String> lines = new ArrayList<>();
+        lines.add("Classified as " + levelNew + (isBlank(filiere) ? "" : " (" + filiere + " pathway)"));
         if (!isBlank(levelOld)) {
-            text.append(levelOld.equals("Candidat")
-                    ? " Previously a candidate club (no official level)."
-                    : " Previously " + levelOld + ".");
+            lines.add(levelOld.equals("Candidat")
+                    ? "Previously a candidate club (no official level)"
+                    : "Previously " + levelOld);
         }
-        return text.toString();
+        return String.join("\n", lines);
     }
 
     private static boolean isBlank(String value) {

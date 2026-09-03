@@ -19,6 +19,11 @@
 
     <div id="level-filter" class="level-filter"></div>
 
+    <aside id="schedule-panel" class="schedule-panel" hidden>
+        <button id="schedule-panel-close" class="club-panel-close" aria-label="Close">&times;</button>
+        <div id="schedule-panel-content"></div>
+    </aside>
+
     <aside id="club-panel" class="club-panel" hidden>
         <button id="club-panel-close" class="club-panel-close" aria-label="Close">&times;</button>
         <div id="club-panel-content"></div>
@@ -26,6 +31,10 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
             integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- Weekly schedule popup: FullCalendar's bundled build (core + timeGrid
+         + interaction plugins), MIT-licensed, CSS is injected by the JS itself -->
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"
+            integrity="sha384-B1OFx8Gy9GjPu8UbUyXbGQpzll9ubAUQ9agInFJ8NnD7nYG1u/CLR+Sqr5yifl4q" crossorigin="anonymous"></script>
     <script th:src="@{/js/map.js}"></script>
 </body>
 </html>

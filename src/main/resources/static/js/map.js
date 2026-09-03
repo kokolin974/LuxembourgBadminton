@@ -312,7 +312,7 @@ function refreshHeatmap() {
 
 // Marker icon reflects the club's level (clubLevel1.png..clubLevel7.png); falls
 // back to the plain house icon if the club has no level or its image fails to load.
-const DEFAULT_ICON_URL = '/img/house-marker.svg';
+const DEFAULT_ICON_URL = '/img/house-marker.png';
 
 // Icon shrinks as you zoom in — at country-wide zoom a bigger icon stays
 // visible, but once you're zoomed into a small area a 40px house photo per
@@ -357,17 +357,218 @@ const LEVELS = [
     { field: 'membership', cssClass: 'ov-membership' }
 ];
 
+// Saved drag positions come back from the API as a JSON string (see
+// Club.overlayPositions) — {"governance": {"left": 52.3, "top": 30.1}, ...}.
+function parseOverlayPositions(club) {
+    if (!club.overlayPositions) {
+        return {};
+    }
+    try {
+        return JSON.parse(club.overlayPositions);
+    } catch (err) {
+        console.error('Failed to parse overlayPositions', err);
+        return {};
+    }
+}
+
+// Multi-fact fields (e.g. manager/coach/officials, three fee amounts) are
+// stored one fact per line — rendered as a bullet list when there's more
+// than one line, otherwise as plain text. data-field identifies each block
+// for the drag handler (see makeOverlayDraggable); a saved position (if this
+// club has one for that level) overrides the CSS default via inline style.
 function levelOverlaysHtml(club) {
+    const positions = parseOverlayPositions(club);
     return LEVELS.map(level => {
         const text = club[level.field];
-        const escaped = text ? escapeHtml(text) : '';
-        return `<div class="club-overlay ${level.cssClass}" title="${escaped}">${escaped}</div>`;
+        const saved = positions[level.field];
+        const styleAttr = saved
+            ? ` style="left:${saved.left}%; top:${saved.top}%; right:auto;"`
+            : '';
+        if (!text) {
+            return `<div class="club-overlay ${level.cssClass}" data-field="${level.field}"${styleAttr}></div>`;
+        }
+        const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
+        const content = lines.length > 1
+            ? `<ul>${lines.map(line => `<li>${escapeHtml(line)}</li>`).join('')}</ul>`
+            : escapeHtml(lines[0] ?? text);
+        const tooltip = escapeHtml(lines.join(' — '));
+        return `<div class="club-overlay ${level.cssClass}" data-field="${level.field}"${styleAttr} title="${tooltip}">${content}</div>`;
     }).join('');
 }
 
 const panel = document.getElementById('club-panel');
 const panelContent = document.getElementById('club-panel-content');
 const panelClose = document.getElementById('club-panel-close');
+
+const schedulePanel = document.getElementById('schedule-panel');
+const schedulePanelContent = document.getElementById('schedule-panel-content');
+const schedulePanelClose = document.getElementById('schedule-panel-close');
+
+// FullCalendar's daysOfWeek uses 0=Sunday..6=Saturday.
+const DAY_NAME_TO_INDEX = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
+const DAY_INDEX_TO_NAME = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+function saveSlot(clubId, slotId, dayOfWeek, startTime, endTime, label) {
+    const url = slotId
+        ? `/api/clubs/${clubId}/schedule/${slotId}`
+        : `/api/clubs/${clubId}/schedule`;
+    return fetch(url, {
+        method: slotId ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dayOfWeek, startTime, endTime, label: label || null })
+    }).then(response => response.json());
+}
+
+function deleteSlotRequest(clubId, slotId) {
+    return fetch(`/api/clubs/${clubId}/schedule/${slotId}`, { method: 'DELETE' });
+}
+
+// Recurring (daysOfWeek-based) events, one per weekday the slot repeats on —
+// no real date, since this is a repeating weekly pattern, not a specific week.
+// title (if set) shows on the event block alongside FullCalendar's own
+// default time-range text.
+function slotToEvent(slot) {
+    return {
+        id: String(slot.id),
+        daysOfWeek: [DAY_NAME_TO_INDEX[slot.dayOfWeek]],
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        title: slot.label || '',
+        extendedProps: { label: slot.label || '' }
+    };
+}
+
+function pad2(n) {
+    return String(n).padStart(2, '0');
+}
+
+function timeStringFromDate(date) {
+    return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+}
+
+let scheduleCalendar = null;
+let scheduleEditPopover = null;
+
+function closeScheduleEditPopover() {
+    if (scheduleEditPopover) {
+        scheduleEditPopover.remove();
+        scheduleEditPopover = null;
+    }
+    document.removeEventListener('pointerdown', handleOutsideClick, true);
+}
+
+function handleOutsideClick(event) {
+    if (scheduleEditPopover && !scheduleEditPopover.contains(event.target)) {
+        closeScheduleEditPopover();
+    }
+}
+
+// Popover for editing/deleting the slot behind a clicked event. Recurring
+// events don't have simply-mutable start/end props, so a saved edit is
+// applied by removing and re-adding the calendar event rather than mutating
+// it in place — the DB row itself is a normal PUT, same id throughout.
+function openScheduleEditPopover(clubId, calendarEvent, clientX, clientY) {
+    closeScheduleEditPopover();
+
+    const dayName = DAY_INDEX_TO_NAME[calendarEvent.start.getDay()];
+    const popover = document.createElement('div');
+    popover.className = 'schedule-edit-popover';
+    popover.style.left = `${Math.min(clientX, window.innerWidth - 220)}px`;
+    popover.style.top = `${Math.min(clientY, window.innerHeight - 140)}px`;
+    const currentLabel = calendarEvent.extendedProps.label || '';
+    popover.innerHTML = `
+        <label>Start <input type="time" class="schedule-edit-start" value="${timeStringFromDate(calendarEvent.start)}"/></label>
+        <label>End <input type="time" class="schedule-edit-end" value="${timeStringFromDate(calendarEvent.end)}"/></label>
+        <label>Text <input type="text" class="schedule-edit-label" value="${escapeHtml(currentLabel)}" placeholder="e.g. Youth"/></label>
+        <div class="schedule-edit-popover-actions">
+            <button type="button" class="schedule-edit-delete">Delete</button>
+            <button type="button" class="schedule-edit-close">Done</button>
+        </div>
+    `;
+    document.body.appendChild(popover);
+    scheduleEditPopover = popover;
+    setTimeout(() => document.addEventListener('pointerdown', handleOutsideClick, true), 0);
+
+    const startInput = popover.querySelector('.schedule-edit-start');
+    const endInput = popover.querySelector('.schedule-edit-end');
+    const labelInput = popover.querySelector('.schedule-edit-label');
+
+    function persist() {
+        saveSlot(clubId, calendarEvent.id, dayName, startInput.value, endInput.value, labelInput.value).then(saved => {
+            calendarEvent.remove();
+            scheduleCalendar.addEvent(slotToEvent(saved));
+        });
+    }
+
+    startInput.addEventListener('change', persist);
+    endInput.addEventListener('change', persist);
+    labelInput.addEventListener('change', persist);
+
+    popover.querySelector('.schedule-edit-delete').addEventListener('click', () => {
+        deleteSlotRequest(clubId, calendarEvent.id);
+        calendarEvent.remove();
+        closeScheduleEditPopover();
+    });
+
+    popover.querySelector('.schedule-edit-close').addEventListener('click', closeScheduleEditPopover);
+}
+
+function openSchedulePanel(club) {
+    schedulePanelContent.innerHTML = `
+        <h2>${escapeHtml(club.name)} — Weekly schedule</h2>
+        <p class="schedule-hint">Drag across empty time to add a session; click a session to edit or delete it.</p>
+        <div id="schedule-calendar"></div>
+    `;
+    schedulePanel.hidden = false;
+    closeScheduleEditPopover();
+
+    if (scheduleCalendar) {
+        scheduleCalendar.destroy();
+    }
+
+    fetch(`/api/clubs/${club.id}/schedule`)
+        .then(response => response.json())
+        .then(slots => {
+            const calendarEl = document.getElementById('schedule-calendar');
+            scheduleCalendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'timeGridWeek',
+                headerToolbar: false,
+                dayHeaderFormat: { weekday: 'short' },
+                // 24-hour, matching how every time is entered/stored elsewhere
+                // in this app — avoids an ambiguous, sometimes-truncated am/pm.
+                slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
+                eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
+                allDaySlot: false,
+                slotMinTime: '08:00:00',
+                slotMaxTime: '23:00:00',
+                slotDuration: '00:30:00',
+                height: 560,
+                nowIndicator: false,
+                selectable: true,
+                selectMirror: true,
+                eventColor: '#1f6f4d',
+                events: slots.map(slotToEvent),
+                select: info => {
+                    const dayName = DAY_INDEX_TO_NAME[info.start.getDay()];
+                    saveSlot(club.id, null, dayName, timeStringFromDate(info.start), timeStringFromDate(info.end))
+                        .then(saved => {
+                            scheduleCalendar.unselect();
+                            scheduleCalendar.addEvent(slotToEvent(saved));
+                        });
+                },
+                eventClick: info => {
+                    openScheduleEditPopover(club.id, info.event, info.jsEvent.clientX, info.jsEvent.clientY);
+                }
+            });
+            scheduleCalendar.render();
+        })
+        .catch(err => console.error('Failed to load schedule', err));
+}
+
+schedulePanelClose.addEventListener('click', () => {
+    schedulePanel.hidden = true;
+    closeScheduleEditPopover();
+});
 
 let allMarkers = [];
 
@@ -474,6 +675,67 @@ function wireRadiusControl(club) {
     });
 }
 
+// Lets a level's text block be click-and-dragged to wherever actually fits
+// for that club's content, rather than relying on one guessed default
+// position for every club. Saved on drop via PATCH .../overlay-positions, so
+// it's still there next time this club's panel is opened.
+function makeOverlayDraggable(el, wrapEl, club) {
+    let dragging = false;
+    let startX, startY, startLeftPct, startTopPct;
+    let finalLeftPct, finalTopPct;
+
+    el.addEventListener('pointerdown', event => {
+        dragging = true;
+        try {
+            el.setPointerCapture(event.pointerId);
+        } catch (err) {
+            // Capture is a nice-to-have (keeps the drag going if the pointer
+            // strays outside the element); losing it shouldn't abort the
+            // rest of this handler and leave the start position unset.
+        }
+        startX = event.clientX;
+        startY = event.clientY;
+        const wrapRect = wrapEl.getBoundingClientRect();
+        const elRect = el.getBoundingClientRect();
+        startLeftPct = ((elRect.left - wrapRect.left) / wrapRect.width) * 100;
+        startTopPct = ((elRect.top - wrapRect.top) / wrapRect.height) * 100;
+        event.preventDefault();
+    });
+
+    el.addEventListener('pointermove', event => {
+        if (!dragging) {
+            return;
+        }
+        const wrapRect = wrapEl.getBoundingClientRect();
+        const deltaLeftPct = ((event.clientX - startX) / wrapRect.width) * 100;
+        const deltaTopPct = ((event.clientY - startY) / wrapRect.height) * 100;
+        finalLeftPct = startLeftPct + deltaLeftPct;
+        finalTopPct = startTopPct + deltaTopPct;
+        el.style.left = `${finalLeftPct}%`;
+        el.style.top = `${finalTopPct}%`;
+        el.style.right = 'auto';
+    });
+
+    el.addEventListener('pointerup', () => {
+        const wasDragging = dragging;
+        dragging = false;
+        // A plain click (no pointermove in between) never set final*Pct —
+        // nothing actually moved, so there's nothing new to save.
+        if (!wasDragging || finalLeftPct === undefined) {
+            return;
+        }
+        const positions = parseOverlayPositions(club);
+        positions[el.dataset.field] = { left: finalLeftPct, top: finalTopPct };
+        club.overlayPositions = JSON.stringify(positions);
+
+        fetch(`/api/clubs/${club.id}/overlay-positions`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(positions)
+        }).catch(err => console.error('Failed to save overlay position', err));
+    });
+}
+
 function openClubPanel(club, marker) {
     panelContent.innerHTML = `
         <div class="club-house">
@@ -487,13 +749,19 @@ function openClubPanel(club, marker) {
     `;
     panel.hidden = false;
 
+    const wrapEl = panelContent.querySelector('.club-house-wrap');
+    panelContent.querySelectorAll('.club-overlay').forEach(el => makeOverlayDraggable(el, wrapEl, club));
+
     wireRadiusControl(club);
     hideOtherMarkers(marker);
     setHeatmapClubs([club]);
+    openSchedulePanel(club);
 }
 
 panelClose.addEventListener('click', () => {
     panel.hidden = true;
+    schedulePanel.hidden = true;
+    closeScheduleEditPopover();
     applyFilter();
 });
 

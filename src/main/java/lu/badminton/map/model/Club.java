@@ -63,6 +63,13 @@ public class Club {
     // behavior depends on it, unlike level (which drives icon/radius).
     private String filiere;
 
+    // Per-level {left, top} percentage offsets for the house diagram's
+    // draggable text overlays, serialized as JSON (e.g. {"governance":
+    // {"left":52.3,"top":30.1}}). A flexible per-club UI preference, not
+    // structured business data, so one JSON column instead of 14 rigid ones.
+    @Column(length = 2000)
+    private String overlayPositions;
+
     protected Club() {
         // JPA
     }
@@ -208,5 +215,13 @@ public class Club {
 
     public void setFiliere(String filiere) {
         this.filiere = filiere;
+    }
+
+    public String getOverlayPositions() {
+        return overlayPositions;
+    }
+
+    public void setOverlayPositions(String overlayPositions) {
+        this.overlayPositions = overlayPositions;
     }
 }
