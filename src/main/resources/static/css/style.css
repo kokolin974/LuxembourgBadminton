@@ -153,10 +153,33 @@ header h1 {
 }
 
 .club-marker-img {
-    width: 100%;
-    height: 100%;
     object-fit: contain;
     display: block;
+}
+
+/* Wraps the house image and its name label into one clickable divIcon —
+   wider than the image itself so the label has room without wrapping. */
+.club-marker-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+}
+
+.club-marker-label {
+    max-width: 100%;
+    margin-top: 1px;
+    color: #1a1a1a;
+    font-weight: 600;
+    line-height: 1.2;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-shadow:
+        0 0 2px #fff, 0 0 2px #fff,
+        1px 1px 1px #fff, -1px -1px 1px #fff,
+        1px -1px 1px #fff, -1px 1px 1px #fff;
 }
 
 .club-panel {

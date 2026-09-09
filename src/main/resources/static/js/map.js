@@ -335,6 +335,8 @@ const DEFAULT_ICON_URL = '/img/house-marker.png';
 // visible, but once you're zoomed into a small area a 40px house photo per
 // marker gets overwhelming, especially where several markers sit close
 // together. Tuned in bands rather than a continuous formula for predictability.
+// This is the base size for a mid-level club — iconForClub scales it further
+// by the club's own level (see LEVEL_SIZE_FACTOR_MIN/MAX below).
 function iconSizeForZoom(zoom) {
     if (zoom <= 10) return 40;
     if (zoom <= 12) return 32;
@@ -343,13 +345,45 @@ function iconSizeForZoom(zoom) {
     return 18;
 }
 
-function iconForClub(club, size) {
+// Higher levels render bigger: 1 - Découverte is the smallest, 7 - Platine
+// the largest, linearly in between. Applied on top of the zoom-based base
+// size above, so the level ordering stays visible at every zoom.
+const LEVEL_SIZE_FACTOR_MIN = 0.7;
+const LEVEL_SIZE_FACTOR_MAX = 1.3;
+
+function levelSizeFactor(level) {
+    if (!level) {
+        return 1;
+    }
+    const t = (level.level - 1) / 6; // 0 (Découverte) .. 1 (Platine)
+    return LEVEL_SIZE_FACTOR_MIN + (LEVEL_SIZE_FACTOR_MAX - LEVEL_SIZE_FACTOR_MIN) * t;
+}
+
+function iconForClub(club, baseSize) {
     const url = club.level ? `/img/clubLevel${club.level.level}.png` : DEFAULT_ICON_URL;
+    const size = Math.round(baseSize * levelSizeFactor(club.level));
+
+    // Name label sits below the house, inside the same divIcon (so clicking
+    // it triggers the marker's own click handler, same as clicking the
+    // house) — sized off the icon so it scales along with level/zoom, with
+    // a wider box than the icon itself so short names don't wrap and long
+    // ones ellipsize instead of overlapping neighboring markers.
+    const labelFontSize = Math.max(9, Math.round(size * 0.28));
+    const labelWidth = Math.max(size * 2.4, 70);
+    const labelHeight = Math.round(labelFontSize * 1.35) + 3;
+    const name = escapeHtml(club.name);
+
     return L.divIcon({
-        html: `<img class="club-marker-img" src="${url}" onerror="this.src='${DEFAULT_ICON_URL}'"/>`,
+        html: `
+            <div class="club-marker-wrap" style="width:${labelWidth}px;">
+                <img class="club-marker-img" style="width:${size}px; height:${size}px;"
+                     src="${url}" onerror="this.src='${DEFAULT_ICON_URL}'"/>
+                <div class="club-marker-label" style="font-size:${labelFontSize}px;" title="${name}">${name}</div>
+            </div>
+        `,
         className: 'club-marker-icon',
-        iconSize: [size, size],
-        iconAnchor: [size / 2, size],
+        iconSize: [labelWidth, size + labelHeight],
+        iconAnchor: [labelWidth / 2, size],
         popupAnchor: [0, -size * 0.9]
     });
 }
