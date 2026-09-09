@@ -49,6 +49,56 @@ header h1 {
     max-width: 220px;
 }
 
+/* Year picker — same floating-box treatment as .level-filter, opposite
+   corner. Buttons (not checkboxes) since exactly one year is ever selected. */
+.year-filter {
+    position: fixed;
+    /* Below Leaflet's top-left zoom control, not beside .level-filter's
+       corner — this stays out of both. */
+    top: 130px;
+    left: 12px;
+    z-index: 900;
+    background: rgba(255, 255, 255, 0.92);
+    border-radius: 6px;
+    padding: 0.6rem 0.75rem;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+    font-size: 0.85rem;
+}
+
+.year-filter h3 {
+    margin: 0 0 0.4rem 0;
+    font-size: 0.8rem;
+    color: #1f6f4d;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.year-filter-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    max-width: 220px;
+}
+
+.year-filter-btn {
+    border: 1px solid #1f6f4d;
+    background: white;
+    color: #1f6f4d;
+    border-radius: 4px;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.year-filter-btn:hover {
+    background: #eaf3ee;
+}
+
+.year-filter-btn.active {
+    background: #1f6f4d;
+    color: white;
+}
+
 .level-filter h3 {
     margin: 0 0 0.4rem 0;
     font-size: 0.8rem;
@@ -365,6 +415,44 @@ header h1 {
 .club-overlay.ov-club-activities { top: 65.5%; }
 .club-overlay.ov-membership { top: 75.5%; }
 
+.admin-year-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.6rem 1rem;
+    background: #eef4f0;
+    border-bottom: 1px solid #dde5e0;
+    font-size: 0.9rem;
+}
+
+.admin-year-link {
+    color: #1f6f4d;
+    text-decoration: none;
+    border: 1px solid #1f6f4d;
+    border-radius: 4px;
+    padding: 0.15rem 0.5rem;
+}
+
+.admin-year-link:hover {
+    background: #dcece3;
+}
+
+.admin-year-link.admin-year-active {
+    background: #1f6f4d;
+    color: white;
+}
+
+.admin-year-new {
+    margin-left: auto;
+}
+
+.admin-form-hint-highlight {
+    background: #fff6e0;
+    border: 1px solid #e8c766;
+    border-radius: 4px;
+    padding: 0.5rem;
+}
+
 .admin {
     max-width: 1100px;
     margin: 1.5rem auto;
@@ -482,6 +570,11 @@ header h1 {
 
 .admin-list td a:hover {
     text-decoration: underline;
+}
+
+.admin-list td form {
+    display: inline-block;
+    margin-right: 0.3rem;
 }
 
 .admin-delete {

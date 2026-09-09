@@ -1,9 +1,11 @@
 package lu.badminton.map.config;
 
 import lu.badminton.map.model.Club;
+import lu.badminton.map.model.ClubYear;
 import lu.badminton.map.model.Level;
 import lu.badminton.map.model.ScheduleSlot;
 import lu.badminton.map.repository.ClubRepository;
+import lu.badminton.map.repository.ClubYearRepository;
 import lu.badminton.map.repository.LevelRepository;
 import lu.badminton.map.repository.ScheduleSlotRepository;
 import org.apache.commons.csv.CSVFormat;
@@ -30,9 +32,13 @@ public class DataSeeder {
     private static final String CLUBS_CSV_PATH = "import/clubs_import.csv";
     private static final String SCHEDULES_CSV_PATH = "import/schedules_import.csv";
 
+    // The CSV has no year column — it's a single snapshot, so it's imported
+    // as this one year. Later years are entered through the admin page.
+    private static final int SEED_YEAR = 2026;
+
     @Bean
-    CommandLineRunner seedData(ClubRepository clubRepository, LevelRepository levelRepository,
-                                ScheduleSlotRepository scheduleSlotRepository) {
+    CommandLineRunner seedData(ClubRepository clubRepository, ClubYearRepository clubYearRepository,
+                                LevelRepository levelRepository, ScheduleSlotRepository scheduleSlotRepository) {
         return args -> {
             if (levelRepository.count() == 0) {
                 levelRepository.save(new Level(1, "Découverte", 5));
@@ -45,7 +51,7 @@ public class DataSeeder {
             }
 
             if (clubRepository.count() == 0) {
-                importClubsFromCsv(clubRepository, levelRepository);
+                importClubsFromCsv(clubRepository, clubYearRepository, levelRepository);
             }
 
             if (scheduleSlotRepository.count() == 0) {
@@ -59,8 +65,10 @@ public class DataSeeder {
     // "N_fieldName" convention) and composes the actual display text for each
     // of the 7 house-level bands. This composition step is deliberately here,
     // not baked into the CSV, so the CSV stays a clean structured source and
-    // this is the one place that turns it into prose.
-    private static void importClubsFromCsv(ClubRepository clubRepository, LevelRepository levelRepository) throws IOException {
+    // this is the one place that turns it into prose. Each row becomes a Club
+    // (identity/location) plus one ClubYear snapshot for SEED_YEAR.
+    private static void importClubsFromCsv(ClubRepository clubRepository, ClubYearRepository clubYearRepository,
+                                             LevelRepository levelRepository) throws IOException {
         ClassPathResource resource = new ClassPathResource(CLUBS_CSV_PATH);
         CSVFormat format = CSVFormat.DEFAULT.builder().setHeader().setSkipHeaderRecord(true).build();
 
@@ -75,7 +83,12 @@ public class DataSeeder {
                         record.get("name"),
                         record.get("city"),
                         Double.parseDouble(record.get("latitude")),
-                        Double.parseDouble(record.get("longitude")),
+                        Double.parseDouble(record.get("longitude")));
+                clubRepository.save(club);
+
+                ClubYear clubYear = new ClubYear(
+                        club,
+                        SEED_YEAR,
                         membershipText(record.get("1_licencesJeunes"), record.get("1_licencesTotal")),
                         clubActivitiesText(record.get("2_equipeInterclubJeune"), record.get("2_equipeInterclubSenior"), record.get("2_cadresTotal")),
                         humanResourcesText(record.get("3_nomResponsable"), record.get("3_entraineurProClub"), record.get("3_officielTechnique")),
@@ -88,8 +101,8 @@ public class DataSeeder {
                         governanceText(record.get("6_levelOld"), record.get("6_filiere"), record.get("6_levelNew")),
                         null, // Vision & Strategy — no source data yet
                         level);
-                club.setFiliere(blankToNull(record.get("6_filiere")));
-                clubRepository.save(club);
+                clubYear.setFiliere(blankToNull(record.get("6_filiere")));
+                clubYearRepository.save(clubYear);
             }
         }
     }

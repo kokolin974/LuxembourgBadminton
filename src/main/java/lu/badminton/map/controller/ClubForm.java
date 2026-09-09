@@ -18,6 +18,7 @@ public class ClubForm {
     private Integer levelId;
     private Double radiusOverrideKm;
     private String filiere;
+    private Integer year;
 
     public String getName() {
         return name;
@@ -129,5 +130,13 @@ public class ClubForm {
 
     public void setFiliere(String filiere) {
         this.filiere = filiere;
+    }
+
+    public Integer getYear() {
+        return year;
+    }
+
+    public void setYear(Integer year) {
+        this.year = year;
     }
 }

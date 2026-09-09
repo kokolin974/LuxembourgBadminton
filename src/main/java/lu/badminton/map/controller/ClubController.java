@@ -2,7 +2,8 @@ package lu.badminton.map.controller;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lu.badminton.map.model.Club;
+import lu.badminton.map.model.ClubYear;
+import lu.badminton.map.model.ClubYearView;
 import lu.badminton.map.service.ClubService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -11,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/clubs")
+@RequestMapping("/api")
 public class ClubController {
 
     private final ClubService clubService;
@@ -22,67 +23,64 @@ public class ClubController {
         this.objectMapper = objectMapper;
     }
 
-    @GetMapping
-    public List<Club> getAllClubs() {
-        return clubService.findAll();
+    // Every year that has at least one club's data on file — drives the
+    // map's year buttons (and defaults to the latest below when omitted).
+    @GetMapping("/years")
+    public List<Integer> getYears() {
+        return clubService.findAllYears();
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<Club> getClub(@PathVariable Long id) {
-        return ResponseEntity.ok(clubService.findById(id));
+    // Clubs as they existed in ?year=YYYY (defaults to the latest year on file).
+    @GetMapping("/clubs")
+    public List<ClubYearView> getClubs(@RequestParam(required = false) Integer year) {
+        return clubService.findAllForYear(year);
     }
 
-    @PostMapping
-    public ResponseEntity<Club> createClub(@RequestBody Club club) {
-        return ResponseEntity.ok(clubService.save(club));
+    // Every club-year snapshot that has ever existed, across all years — the
+    // map fetches this once at load to calibrate the heatmap's color scale
+    // from the true all-time peak, so a sparse year reads as visibly paler
+    // than a well-covered one instead of each year stretching to fill the
+    // same range.
+    @GetMapping("/clubs/history")
+    public List<ClubYearView> getHistory() {
+        return clubService.findAllHistory();
     }
 
-    @PutMapping("/{id}")
-    public ResponseEntity<Club> updateClub(@PathVariable Long id, @RequestBody Club updated) {
-        Club existing = clubService.findById(id);
-        existing.setName(updated.getName());
-        existing.setCity(updated.getCity());
-        existing.setLatitude(updated.getLatitude());
-        existing.setLongitude(updated.getLongitude());
-        existing.setMembership(updated.getMembership());
-        existing.setClubActivities(updated.getClubActivities());
-        existing.setHumanResources(updated.getHumanResources());
-        existing.setFinance(updated.getFinance());
-        existing.setCommunication(updated.getCommunication());
-        existing.setGovernance(updated.getGovernance());
-        existing.setVisionStrategy(updated.getVisionStrategy());
-        existing.setLevel(updated.getLevel());
-        existing.setFiliere(updated.getFiliere());
-        return ResponseEntity.ok(clubService.save(existing));
+    @GetMapping("/clubs/{id}")
+    public ResponseEntity<ClubYearView> getClub(@PathVariable Long id, @RequestParam(required = false) Integer year) {
+        return ResponseEntity.ok(clubService.findForYear(id, year));
     }
 
     // Lightweight endpoint for the map's radius slider (club panel) — updates
-    // just the radius override without needing the full admin form payload.
-    @PatchMapping("/{id}/radius")
-    public ResponseEntity<Club> updateRadius(@PathVariable Long id, @RequestBody RadiusUpdate body) {
-        Club existing = clubService.findById(id);
-        existing.setRadiusOverrideKm(body.radiusOverrideKm());
-        return ResponseEntity.ok(clubService.save(existing));
+    // just the radius override for one club's one year, without needing the
+    // full admin form payload.
+    @PatchMapping("/clubs/{id}/years/{year}/radius")
+    public ResponseEntity<ClubYearView> updateRadius(@PathVariable Long id, @PathVariable int year,
+                                                       @RequestBody RadiusUpdate body) {
+        ClubYear clubYear = requireYearRow(id, year);
+        clubYear.setRadiusOverrideKm(body.radiusOverrideKm());
+        return ResponseEntity.ok(ClubYearView.of(clubService.saveYear(clubYear)));
     }
 
     // Lightweight endpoint for the map's draggable house-diagram text — saves
-    // where each level's block was dropped, per club, so it's still there
-    // next time this club's panel is opened. Body is {"governance":
-    // {"left":52.3,"top":30.1}, ...}, stored as-is (serialized) rather than
-    // modeled as columns, since it's a UI preference, not business data.
-    @PatchMapping("/{id}/overlay-positions")
-    public ResponseEntity<Club> updateOverlayPositions(@PathVariable Long id,
-                                                        @RequestBody Map<String, Map<String, Double>> positions)
+    // where each level's block was dropped, per club per year, so it's still
+    // there next time this club's panel is opened for that year. Body is
+    // {"governance": {"left":52.3,"top":30.1}, ...}, stored as-is
+    // (serialized) rather than modeled as columns, since it's a UI
+    // preference, not business data.
+    @PatchMapping("/clubs/{id}/years/{year}/overlay-positions")
+    public ResponseEntity<ClubYearView> updateOverlayPositions(@PathVariable Long id, @PathVariable int year,
+                                                                 @RequestBody Map<String, Map<String, Double>> positions)
             throws JsonProcessingException {
-        Club existing = clubService.findById(id);
-        existing.setOverlayPositions(objectMapper.writeValueAsString(positions));
-        return ResponseEntity.ok(clubService.save(existing));
+        ClubYear clubYear = requireYearRow(id, year);
+        clubYear.setOverlayPositions(objectMapper.writeValueAsString(positions));
+        return ResponseEntity.ok(ClubYearView.of(clubService.saveYear(clubYear)));
     }
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteClub(@PathVariable Long id) {
-        clubService.deleteById(id);
-        return ResponseEntity.noContent().build();
+    private ClubYear requireYearRow(Long clubId, int year) {
+        return clubService.findYearRow(clubId, year)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Club " + clubId + " has no data for year " + year));
     }
 
     public record RadiusUpdate(Double radiusOverrideKm) {

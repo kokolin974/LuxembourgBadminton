@@ -12,17 +12,42 @@
         <a class="header-link" th:href="@{/}">View map</a>
     </header>
 
+    <!--
+        Every field below (except name/city/lat/lng, which live on the club
+        itself) belongs to one year's snapshot. Switching the year picker
+        reloads the list for that year; editing a club always edits (or, if
+        that year has no snapshot yet, creates) the snapshot for whichever
+        year the form's "Year" field says.
+    -->
+    <div class="admin-year-bar">
+        <span>Year:</span>
+        <a th:each="y : ${years}" th:href="@{/admin/clubs(year=${y})}"
+           th:text="${y}" th:classappend="${y == selectedYear} ? ' admin-year-active'" class="admin-year-link"></a>
+        <a th:href="@{/admin/clubs/new(year=${selectedYear + 1})}" class="admin-year-link admin-year-new"
+           th:text="'+ New year (' + ${selectedYear + 1} + ')'"></a>
+    </div>
+
     <main class="admin">
         <section class="admin-form">
-            <h2 th:text="${editingId != null} ? 'Edit club' : 'Add a club'"></h2>
+            <h2 th:text="${editingId != null} ? 'Edit club — ' + ${clubForm.year} : 'Add a club — ' + ${clubForm.year}"></h2>
+            <p th:if="${isNewYearForClub != null and isNewYearForClub}" class="admin-form-hint admin-form-hint-highlight"
+               th:text="'No data on file for this club in ' + ${clubForm.year} + ' yet — fields below are pre-filled from its most recent prior year. Saving will create a new snapshot for ' + ${clubForm.year} + ' rather than changing any earlier year.'"></p>
+            <p th:if="${clubYears != null}" class="admin-form-hint">
+                Years on file for this club:
+                <span th:each="y, iter : ${clubYears}">
+                    <a th:href="@{/admin/clubs/{id}/edit(id=${editingId},year=${y})}" th:text="${y}"
+                       th:classappend="${y == clubForm.year} ? ' admin-year-active'" class="admin-year-link"></a><span th:if="${!iter.last}">, </span>
+                </span>
+            </p>
             <!--
                 Latitude/longitude are entered by hand for now. The natural
                 next step is a "look up city" action here that geocodes the
                 city name (e.g. via the free Nominatim/OSM API) and fills
                 these two fields in automatically.
             -->
-            <form th:action="${editingId != null} ? @{/admin/clubs/{id}/update(id=${editingId})} : @{/admin/clubs}"
+            <form th:action="${editingId != null} ? @{/admin/clubs/{id}/years/{year}/update(id=${editingId},year=${clubForm.year})} : @{/admin/clubs}"
                   th:object="${clubForm}" method="post">
+                <input type="hidden" th:field="*{year}"/>
                 <label>
                     Name
                     <input type="text" th:field="*{name}" required/>
@@ -90,13 +115,13 @@
                     Vision &amp; Strategy
                     <textarea th:field="*{visionStrategy}" rows="2"></textarea>
                 </label>
-                <button type="submit" th:text="${editingId != null} ? 'Update club' : 'Add club'"></button>
-                <a th:if="${editingId != null}" th:href="@{/admin/clubs}" class="admin-cancel">Cancel</a>
+                <button type="submit" th:text="${editingId != null} ? 'Save ' + ${clubForm.year} : 'Add club'"></button>
+                <a th:if="${editingId != null}" th:href="@{/admin/clubs(year=${selectedYear})}" class="admin-cancel">Cancel</a>
             </form>
         </section>
 
         <section class="admin-list">
-            <h2>Existing clubs</h2>
+            <h2 th:text="'Clubs in ' + ${selectedYear}"></h2>
             <table>
                 <thead>
                     <tr>
@@ -111,7 +136,7 @@
                 </thead>
                 <tbody>
                     <tr th:each="club : ${clubs}">
-                        <td><a th:href="@{/admin/clubs/{id}/edit(id=${club.id})}" th:text="${club.name}"></a></td>
+                        <td><a th:href="@{/admin/clubs/{id}/edit(id=${club.id},year=${selectedYear})}" th:text="${club.name}"></a></td>
                         <td th:text="${club.city}"></td>
                         <td th:text="${club.level != null} ? ${club.level.label} : '—'"></td>
                         <td th:text="${club.filiere != null and !club.filiere.isEmpty()} ? ${club.filiere} : '—'"></td>
@@ -121,8 +146,13 @@
                         </td>
                         <td th:text="${club.latitude} + ', ' + ${club.longitude}"></td>
                         <td>
-                            <form th:action="@{/admin/clubs/{id}/delete(id=${club.id})}" method="post">
-                                <button type="submit" class="admin-delete">Delete</button>
+                            <form th:action="@{/admin/clubs/{id}/years/{year}/delete(id=${club.id},year=${selectedYear})}" method="post">
+                                <button type="submit" class="admin-delete" title="Removes this club's data for this year only"
+                                        th:text="'Remove from ' + ${selectedYear}"></button>
+                            </form>
+                            <form th:action="@{/admin/clubs/{id}/delete(id=${club.id},year=${selectedYear})}" method="post"
+                                  onsubmit="return confirm('Delete this club entirely, including every year\'s data?');">
+                                <button type="submit" class="admin-delete">Delete club (all years)</button>
                             </form>
                         </td>
                     </tr>

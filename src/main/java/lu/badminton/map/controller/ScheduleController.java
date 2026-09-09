@@ -29,7 +29,7 @@ public class ScheduleController {
 
     @PostMapping
     public ResponseEntity<ScheduleSlot> createSlot(@PathVariable Long clubId, @RequestBody SlotRequest body) {
-        Club club = clubService.findById(clubId);
+        Club club = clubService.findClub(clubId);
         ScheduleSlot slot = new ScheduleSlot(club, body.dayOfWeek(),
                 LocalTime.parse(body.startTime()), LocalTime.parse(body.endTime()), body.label());
         return ResponseEntity.ok(scheduleSlotRepository.save(slot));

@@ -136,20 +136,13 @@ const CoverageLayer = L.Layer.extend({
             return;
         }
 
-        // Calibrated from ALL clubs, not just the ones currently drawn — so a
-        // given spot's color means the same thing regardless of what the
-        // level filter or isolation view currently shows. The tradeoff
-        // (explicit product decision): filtering down to a handful of clubs
-        // won't use the full color range, since their overlap can never
-        // approach the country-wide peak. Recomputed on every draw so a
-        // radius change is reflected immediately, but never affected by
-        // which clubs are filtered/isolated — only by allMarkers itself.
-        const peakOverlap = computeMaxOverlapDepth(allMarkers.map(marker => marker.club));
-        // Headroom above the true peak, per product decision: without it,
-        // the single most-overlapped spot would render as pure max-color,
-        // indistinguishable from "almost as covered" areas.
-        const OVERLAP_HEADROOM = 1;
-        const calibratedMax = Math.max(1, peakOverlap + OVERLAP_HEADROOM);
+        // Calibrated from the true all-time peak overlap — every year, every
+        // club, not just the ones currently drawn (see recomputeCalibratedMax)
+        // — so a given spot's color means the same thing regardless of the
+        // level filter, an isolated marker view, OR which year is selected.
+        // That last part is deliberate: recalibrating per year would stretch
+        // even a sparse year to use the full color range, hiding the actual
+        // growth in coverage over time that this whole feature exists to show.
         const perClubAlpha = 1 / calibratedMax;
 
         // Project to the current on-screen circle (center + pixel radius) —
@@ -295,6 +288,30 @@ function computeMaxOverlapDepth(clubs) {
 
 const coverageLayer = new CoverageLayer();
 let heatmapVisible = false;
+
+// Headroom above the true peak, per product decision: without it, the
+// single most-overlapped spot would render as pure max-color,
+// indistinguishable from "almost as covered" areas.
+const OVERLAP_HEADROOM = 1;
+
+// All club-year snapshots that have ever existed, keyed by year — populated
+// once from /api/clubs/history at load, and kept in sync (this year's entry
+// only) whenever the year changes or a radius override is saved. Used only
+// to calibrate the heatmap; never to decide what's shown on the map.
+const clubHistoryByYear = new Map();
+
+// The fixed color-scale ceiling described above CoverageLayer._draw — the
+// highest overlap depth reached by any single year, ever. Recomputed
+// whenever clubHistoryByYear changes.
+let calibratedMax = 1;
+
+function recomputeCalibratedMax() {
+    let peak = 0;
+    clubHistoryByYear.forEach(clubsForYear => {
+        peak = Math.max(peak, computeMaxOverlapDepth(clubsForYear));
+    });
+    calibratedMax = Math.max(1, peak + OVERLAP_HEADROOM);
+}
 
 function setHeatmapClubs(clubs) {
     if (!heatmapVisible) {
@@ -633,8 +650,23 @@ function radiusControlHtml(club) {
     `;
 }
 
+// Keeps the calibration snapshot (see recomputeCalibratedMax) in sync after
+// a radius override changes, so the heatmap's fixed color scale still
+// reflects this club's current radius rather than a stale cached one.
+function updateHistoryEntry(club) {
+    const yearList = clubHistoryByYear.get(club.year);
+    if (!yearList) {
+        return;
+    }
+    const index = yearList.findIndex(c => c.id === club.id);
+    if (index !== -1) {
+        yearList[index] = { ...yearList[index], radiusOverrideKm: club.radiusOverrideKm, effectiveRadiusKm: club.effectiveRadiusKm };
+    }
+    recomputeCalibratedMax();
+}
+
 function saveRadius(club, radiusOverrideKm) {
-    return fetch(`/api/clubs/${club.id}/radius`, {
+    return fetch(`/api/clubs/${club.id}/years/${club.year}/radius`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ radiusOverrideKm })
@@ -643,6 +675,7 @@ function saveRadius(club, radiusOverrideKm) {
         .then(updated => {
             club.radiusOverrideKm = updated.radiusOverrideKm;
             club.effectiveRadiusKm = updated.effectiveRadiusKm;
+            updateHistoryEntry(club);
         })
         .catch(err => console.error('Failed to save radius', err));
 }
@@ -728,7 +761,7 @@ function makeOverlayDraggable(el, wrapEl, club) {
         positions[el.dataset.field] = { left: finalLeftPct, top: finalTopPct };
         club.overlayPositions = JSON.stringify(positions);
 
-        fetch(`/api/clubs/${club.id}/overlay-positions`, {
+        fetch(`/api/clubs/${club.id}/years/${club.year}/overlay-positions`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(positions)
@@ -858,23 +891,89 @@ function renderLevelFilter(levels) {
     });
 }
 
+const yearFilter = document.getElementById('year-filter');
+let currentYear = null;
+
+function renderYearFilter(years) {
+    const buttons = years.map(year => `
+        <button type="button" class="year-filter-btn ${year === currentYear ? 'active' : ''}" data-year="${year}">${year}</button>
+    `).join('');
+    yearFilter.innerHTML = `
+        <h3>Year</h3>
+        <div class="year-filter-buttons">${buttons}</div>
+    `;
+
+    yearFilter.querySelectorAll('.year-filter-btn').forEach(button => {
+        button.addEventListener('click', () => {
+            const year = parseInt(button.dataset.year, 10);
+            if (year === currentYear) {
+                return;
+            }
+            currentYear = year;
+            yearFilter.querySelectorAll('.year-filter-btn').forEach(btn => {
+                btn.classList.toggle('active', parseInt(btn.dataset.year, 10) === year);
+            });
+            panel.hidden = true;
+            schedulePanel.hidden = true;
+            closeScheduleEditPopover();
+            loadClubsForYear(year);
+        });
+    });
+}
+
+// Swaps the marker set to the given year's clubs, keeping the level filter
+// and heatmap calibration in sync. Also refreshes this year's slice of
+// clubHistoryByYear, in case a club was added/edited since the initial load.
+function loadClubsForYear(year) {
+    return fetch(`/api/clubs?year=${year}`)
+        .then(response => response.json())
+        .then(clubs => {
+            allMarkers.forEach(marker => {
+                if (map.hasLayer(marker)) {
+                    map.removeLayer(marker);
+                }
+            });
+
+            const size = iconSizeForZoom(map.getZoom());
+            allMarkers = spreadOverlappingClubs(clubs).map(({ club, lat, lng }) => {
+                const marker = L.marker([lat, lng], { icon: iconForClub(club, size) });
+                marker.club = club;
+                marker.on('click', () => openClubPanel(club, marker));
+                return marker;
+            });
+
+            clubHistoryByYear.set(year, clubs);
+            recomputeCalibratedMax();
+            applyFilter();
+        })
+        .catch(err => console.error('Failed to load clubs for year ' + year, err));
+}
+
 Promise.all([
     fetch('/api/levels').then(response => response.json()),
-    fetch('/api/clubs').then(response => response.json())
+    fetch('/api/years').then(response => response.json()),
+    fetch('/api/clubs/history').then(response => response.json())
 ])
-    .then(([levels, clubs]) => {
+    .then(([levels, years, history]) => {
         selectedLevels = new Set(levels.map(level => level.level));
         renderLevelFilter(levels);
 
-        const size = iconSizeForZoom(map.getZoom());
-        allMarkers = spreadOverlappingClubs(clubs).map(({ club, lat, lng }) => {
-            const marker = L.marker([lat, lng], { icon: iconForClub(club, size) }).addTo(map);
-            marker.club = club;
-            marker.on('click', () => openClubPanel(club, marker));
-            return marker;
+        history.forEach(club => {
+            if (!clubHistoryByYear.has(club.year)) {
+                clubHistoryByYear.set(club.year, []);
+            }
+            clubHistoryByYear.get(club.year).push(club);
         });
+        recomputeCalibratedMax();
+
+        if (years.length === 0) {
+            return;
+        }
+        currentYear = years[years.length - 1];
+        renderYearFilter(years);
+        return loadClubsForYear(currentYear);
     })
-    .catch(err => console.error('Failed to load clubs/levels', err));
+    .catch(err => console.error('Failed to load clubs/levels/years', err));
 
 map.on('zoomend', () => {
     const size = iconSizeForZoom(map.getZoom());
