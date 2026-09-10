@@ -331,6 +331,12 @@ function refreshHeatmap() {
 // back to the plain house icon if the club has no level or its image fails to load.
 const DEFAULT_ICON_URL = '/img/house-marker.png';
 
+// Club-finder state: the pin dropped at a geocoded address, and the ids of
+// the clubs currently shown as suggestions for it (their markers get a ring
+// — see iconForClub). Both cleared when the finder panel is closed.
+let addressMarker = null;
+let suggestedClubIds = new Set();
+
 // Icon shrinks as you zoom in — at country-wide zoom a bigger icon stays
 // visible, but once you're zoomed into a small area a 40px house photo per
 // marker gets overwhelming, especially where several markers sit close
@@ -372,10 +378,11 @@ function iconForClub(club, baseSize) {
     const labelWidth = Math.max(size * 2.4, 70);
     const labelHeight = Math.round(labelFontSize * 1.35) + 3;
     const name = escapeHtml(club.name);
+    const suggestedClass = suggestedClubIds.has(club.id) ? ' club-marker-wrap--suggested' : '';
 
     return L.divIcon({
         html: `
-            <div class="club-marker-wrap" style="width:${labelWidth}px;">
+            <div class="club-marker-wrap${suggestedClass}" style="width:${labelWidth}px;">
                 <img class="club-marker-img" style="width:${size}px; height:${size}px;"
                      src="${url}" onerror="this.src='${DEFAULT_ICON_URL}'"/>
                 <div class="club-marker-label" style="font-size:${labelFontSize}px;" title="${name}">${name}</div>
@@ -668,17 +675,25 @@ const RADIUS_MIN_KM = 1;
 const RADIUS_MAX_KM = 50;
 const RADIUS_STEP_KM = 0.5;
 
+function radiusLabelText(km) {
+    return km != null ? `${km} km` : 'not set';
+}
+
 function radiusControlHtml(club) {
     const levelDefault = club.level ? club.level.radiusKm : null;
-    const current = club.effectiveRadiusKm ?? levelDefault ?? RADIUS_MIN_KM;
+    // effectiveRadiusKm is null when the club has no level and no override —
+    // it genuinely has no area of influence yet, so say so rather than
+    // showing the slider's floor as if it were a real value.
+    const effective = club.effectiveRadiusKm ?? null;
+    const sliderValue = effective ?? levelDefault ?? RADIUS_MIN_KM;
     const hasOverride = club.radiusOverrideKm != null;
     return `
         <div class="club-radius">
-            <label for="club-radius-slider">Radius of influence: <span id="club-radius-value">${current}</span> km</label>
+            <label for="club-radius-slider">Radius of influence: <span id="club-radius-value">${radiusLabelText(effective)}</span></label>
             <input type="range" id="club-radius-slider" min="${RADIUS_MIN_KM}" max="${RADIUS_MAX_KM}"
-                   step="${RADIUS_STEP_KM}" value="${current}"/>
+                   step="${RADIUS_STEP_KM}" value="${sliderValue}"/>
             <button type="button" id="club-radius-reset" class="club-radius-reset" ${hasOverride ? '' : 'hidden'}>
-                Reset to level default (${levelDefault ?? '—'} km)
+                Reset to level default (${levelDefault != null ? levelDefault + ' km' : '—'})
             </button>
         </div>
     `;
@@ -720,7 +735,7 @@ function wireRadiusControl(club) {
     const resetButton = document.getElementById('club-radius-reset');
 
     slider.addEventListener('input', () => {
-        valueLabel.textContent = slider.value;
+        valueLabel.textContent = radiusLabelText(parseFloat(slider.value));
     });
 
     slider.addEventListener('change', () => {
@@ -733,9 +748,9 @@ function wireRadiusControl(club) {
 
     resetButton.addEventListener('click', () => {
         saveRadius(club, null).then(() => {
-            const levelDefault = club.level ? club.level.radiusKm : RADIUS_MIN_KM;
-            slider.value = levelDefault;
-            valueLabel.textContent = levelDefault;
+            const levelDefault = club.level ? club.level.radiusKm : null;
+            slider.value = levelDefault ?? RADIUS_MIN_KM;
+            valueLabel.textContent = radiusLabelText(levelDefault);
             resetButton.hidden = true;
             setHeatmapClubs([club]);
         });
@@ -950,6 +965,10 @@ function renderYearFilter(years) {
             panel.hidden = true;
             schedulePanel.hidden = true;
             closeScheduleEditPopover();
+            // Suggestions are year-specific — drop the old ones rather than
+            // showing a stale ranking against the new year's clubs.
+            suggestionPanel.hidden = true;
+            clearFinderResults();
             loadClubsForYear(year);
         });
     });
@@ -983,6 +1002,254 @@ function loadClubsForYear(year) {
         .catch(err => console.error('Failed to load clubs for year ' + year, err));
 }
 
+// --- Club finder (suggest clubs near an address) ----------------------------
+
+const clubFinder = document.getElementById('club-finder');
+const suggestionPanel = document.getElementById('suggestion-panel');
+const suggestionPanelContent = document.getElementById('suggestion-panel-content');
+const suggestionPanelClose = document.getElementById('suggestion-panel-close');
+
+// Autocomplete state (Photon suggestions under the input).
+let autocompleteItems = [];
+let autocompleteActiveIndex = -1;
+let autocompleteTimer = null;
+
+function renderClubFinder() {
+    clubFinder.innerHTML = `
+        <h3>Find a club</h3>
+        <form id="club-finder-form" autocomplete="off">
+            <div class="club-finder-field">
+                <input type="text" id="club-finder-input" placeholder="Enter an address" autocomplete="off"/>
+                <ul id="club-finder-autocomplete" class="club-finder-autocomplete" hidden></ul>
+            </div>
+            <button type="submit">Search</button>
+        </form>
+    `;
+
+    const form = document.getElementById('club-finder-form');
+    const input = document.getElementById('club-finder-input');
+
+    form.addEventListener('submit', event => {
+        event.preventDefault();
+        hideAutocomplete();
+        const address = input.value.trim();
+        if (address) {
+            runClubFinderByAddress(address);
+        }
+    });
+
+    input.addEventListener('input', () => {
+        const query = input.value.trim();
+        clearTimeout(autocompleteTimer);
+        if (query.length < 3) {
+            hideAutocomplete();
+            return;
+        }
+        autocompleteTimer = setTimeout(() => fetchAutocomplete(query), 250);
+    });
+
+    input.addEventListener('keydown', event => {
+        const listEl = document.getElementById('club-finder-autocomplete');
+        if (listEl.hidden || autocompleteItems.length === 0) {
+            return;
+        }
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            setAutocompleteActive(Math.min(autocompleteActiveIndex + 1, autocompleteItems.length - 1));
+        } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            setAutocompleteActive(Math.max(autocompleteActiveIndex - 1, 0));
+        } else if (event.key === 'Enter' && autocompleteActiveIndex >= 0) {
+            event.preventDefault();
+            selectAutocomplete(autocompleteItems[autocompleteActiveIndex]);
+        } else if (event.key === 'Escape') {
+            hideAutocomplete();
+        }
+    });
+
+    // Any click outside the finder box dismisses the dropdown.
+    document.addEventListener('pointerdown', event => {
+        if (!clubFinder.contains(event.target)) {
+            hideAutocomplete();
+        }
+    });
+}
+
+function fetchAutocomplete(query) {
+    fetch(`/api/address-autocomplete?q=${encodeURIComponent(query)}`)
+        .then(response => (response.ok ? response.json() : []))
+        .then(renderAutocomplete)
+        .catch(() => hideAutocomplete());
+}
+
+function renderAutocomplete(items) {
+    const listEl = document.getElementById('club-finder-autocomplete');
+    autocompleteItems = items || [];
+    autocompleteActiveIndex = -1;
+
+    if (autocompleteItems.length === 0) {
+        hideAutocomplete();
+        return;
+    }
+
+    listEl.innerHTML = autocompleteItems.map((item, index) => `
+        <li class="club-finder-suggestion" data-index="${index}">${escapeHtml(item.label)}</li>
+    `).join('');
+    listEl.hidden = false;
+
+    listEl.querySelectorAll('.club-finder-suggestion').forEach(el => {
+        el.addEventListener('pointerdown', event => {
+            // pointerdown (not click) so it fires before the input's blur.
+            event.preventDefault();
+            selectAutocomplete(autocompleteItems[parseInt(el.dataset.index, 10)]);
+        });
+    });
+}
+
+function setAutocompleteActive(index) {
+    autocompleteActiveIndex = index;
+    const listEl = document.getElementById('club-finder-autocomplete');
+    listEl.querySelectorAll('.club-finder-suggestion').forEach((el, i) => {
+        el.classList.toggle('active', i === index);
+    });
+}
+
+function hideAutocomplete() {
+    const listEl = document.getElementById('club-finder-autocomplete');
+    if (listEl) {
+        listEl.hidden = true;
+        listEl.innerHTML = '';
+    }
+    autocompleteItems = [];
+    autocompleteActiveIndex = -1;
+}
+
+function selectAutocomplete(item) {
+    if (!item) {
+        return;
+    }
+    const input = document.getElementById('club-finder-input');
+    input.value = item.label;
+    hideAutocomplete();
+    runClubFinderByPoint(item.label, item.latitude, item.longitude);
+}
+
+function clearFinderResults() {
+    if (addressMarker) {
+        map.removeLayer(addressMarker);
+        addressMarker = null;
+    }
+    if (suggestedClubIds.size > 0) {
+        suggestedClubIds = new Set();
+        refreshMarkerIcons();
+    }
+}
+
+// Free-text address — geocoded server-side, so a bad address comes back 404.
+function runClubFinderByAddress(address) {
+    fetchClubSuggestions(`address=${encodeURIComponent(address)}`);
+}
+
+// A picked autocomplete suggestion already carries coordinates — no geocode.
+function runClubFinderByPoint(label, latitude, longitude) {
+    fetchClubSuggestions(`lat=${latitude}&lon=${longitude}&label=${encodeURIComponent(label)}`);
+}
+
+function fetchClubSuggestions(params) {
+    suggestionPanel.hidden = false;
+    suggestionPanelContent.innerHTML = '<p class="suggestion-status">Searching…</p>';
+
+    const yearParam = currentYear != null ? `&year=${currentYear}` : '';
+    fetch(`/api/club-suggestions?${params}${yearParam}`)
+        .then(response => {
+            if (response.status === 404) {
+                throw new Error('not-found');
+            }
+            if (!response.ok) {
+                throw new Error('failed');
+            }
+            return response.json();
+        })
+        .then(renderSuggestions)
+        .catch(err => {
+            suggestionPanelContent.innerHTML = err.message === 'not-found'
+                ? '<p class="suggestion-status">Couldn\'t find that address. Try adding the town or postcode.</p>'
+                : '<p class="suggestion-status">Something went wrong looking that up. Please try again.</p>';
+        });
+}
+
+function renderSuggestions(data) {
+    const resolved = data.resolved;
+    const suggestions = data.suggestions || [];
+
+    if (addressMarker) {
+        map.removeLayer(addressMarker);
+    }
+    addressMarker = L.marker([resolved.latitude, resolved.longitude], {
+        icon: L.divIcon({
+            className: 'address-marker-icon',
+            html: '<div class="address-marker-dot"></div>',
+            iconSize: [22, 22],
+            iconAnchor: [11, 11]
+        }),
+        zIndexOffset: 1000
+    }).addTo(map);
+
+    suggestedClubIds = new Set(suggestions.map(s => s.club.id));
+    refreshMarkerIcons();
+
+    // withinRange is null when the club has no level and no radius override —
+    // "range not set", not a definite "out of range".
+    function rangeBadgeHtml(withinRange) {
+        if (withinRange === null || withinRange === undefined) {
+            return '<span class="suggestion-badge range-unset">range not set</span>';
+        }
+        return withinRange
+            ? '<span class="suggestion-badge in-range">in range</span>'
+            : '<span class="suggestion-badge out-of-range">out of range</span>';
+    }
+
+    const items = suggestions.map((s, index) => `
+        <li class="suggestion-item" data-club-id="${s.club.id}">
+            <div class="suggestion-rank">${index + 1}</div>
+            <div>
+                <div class="suggestion-name">${escapeHtml(s.club.name)}</div>
+                <div class="suggestion-meta">
+                    ${escapeHtml(s.club.city)} · ${s.distanceKm} km
+                    ${rangeBadgeHtml(s.withinRange)}
+                </div>
+            </div>
+        </li>
+    `).join('');
+
+    suggestionPanelContent.innerHTML = `
+        <h2>Clubs near this address</h2>
+        <p class="suggestion-resolved">Showing results for:<br><strong>${escapeHtml(resolved.label)}</strong></p>
+        <ol class="suggestion-list">${items || '<li class="suggestion-status">No clubs on file for this year.</li>'}</ol>
+        <p class="suggestion-hint">Ranked by straight-line distance. &ldquo;In range&rdquo; means the address is
+        inside the club&rsquo;s area of influence for ${currentYear}; &ldquo;range not set&rdquo; means the club has
+        no level or radius assigned yet.</p>
+    `;
+
+    suggestionPanelContent.querySelectorAll('.suggestion-item').forEach(el => {
+        el.addEventListener('click', () => {
+            const clubId = parseInt(el.dataset.clubId, 10);
+            const marker = allMarkers.find(m => m.club.id === clubId);
+            if (marker) {
+                suggestionPanel.hidden = true;
+                openClubPanel(marker.club, marker);
+            }
+        });
+    });
+
+    map.panTo([resolved.latitude, resolved.longitude]);
+}
+
+suggestionPanelClose.addEventListener('click', () => {
+    suggestionPanel.hidden = true;
+    clearFinderResults();
+});
+
 Promise.all([
     fetch('/api/levels').then(response => response.json()),
     fetch('/api/years').then(response => response.json()),
@@ -991,6 +1258,7 @@ Promise.all([
     .then(([levels, years, history]) => {
         selectedLevels = new Set(levels.map(level => level.level));
         renderLevelFilter(levels);
+        renderClubFinder();
 
         history.forEach(club => {
             if (!clubHistoryByYear.has(club.year)) {
@@ -1009,7 +1277,11 @@ Promise.all([
     })
     .catch(err => console.error('Failed to load clubs/levels/years', err));
 
-map.on('zoomend', () => {
+// Rebuilds every marker's icon at the current zoom — also picks up changes
+// to suggestedClubIds (the finder ring).
+function refreshMarkerIcons() {
     const size = iconSizeForZoom(map.getZoom());
     allMarkers.forEach(marker => marker.setIcon(iconForClub(marker.club, size)));
-});
+}
+
+map.on('zoomend', refreshMarkerIcons);

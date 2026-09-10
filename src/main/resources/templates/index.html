@@ -17,8 +17,16 @@
 
     <div id="map"></div>
 
-    <div id="year-filter" class="year-filter"></div>
+    <div class="map-left-controls">
+        <div id="club-finder" class="club-finder"></div>
+        <div id="year-filter" class="year-filter"></div>
+    </div>
     <div id="level-filter" class="level-filter"></div>
+
+    <aside id="suggestion-panel" class="suggestion-panel" hidden>
+        <button id="suggestion-panel-close" class="club-panel-close" aria-label="Close">&times;</button>
+        <div id="suggestion-panel-content"></div>
+    </aside>
 
     <aside id="schedule-panel" class="schedule-panel" hidden>
         <button id="schedule-panel-close" class="club-panel-close" aria-label="Close">&times;</button>

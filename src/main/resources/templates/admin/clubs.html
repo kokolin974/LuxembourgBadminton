@@ -141,7 +141,7 @@
                         <td th:text="${club.level != null} ? ${club.level.label} : '—'"></td>
                         <td th:text="${club.filiere != null and !club.filiere.isEmpty()} ? ${club.filiere} : '—'"></td>
                         <td>
-                            <span th:text="${club.effectiveRadiusKm} + ' km'"></span>
+                            <span th:text="${club.effectiveRadiusKm != null} ? ${club.effectiveRadiusKm} + ' km' : '—'"></span>
                             <span th:if="${club.radiusOverrideKm != null}" class="admin-radius-override">(override)</span>
                         </td>
                         <td th:text="${club.latitude} + ', ' + ${club.longitude}"></td>
