@@ -186,6 +186,14 @@ header h1 {
     letter-spacing: 0.03em;
 }
 
+/* Second section header ("Filter by filière") — same look as the first, with
+   a divider and top spacing to separate it from the level checkboxes. */
+.level-filter .level-filter-subhead {
+    margin-top: 0.6rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #ddd;
+}
+
 .level-filter label {
     display: flex;
     align-items: center;
@@ -278,9 +286,8 @@ header h1 {
     font-weight: 600;
     line-height: 1.2;
     text-align: center;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    overflow-wrap: break-word;
     text-shadow:
         0 0 2px #fff, 0 0 2px #fff,
         1px 1px 1px #fff, -1px -1px 1px #fff,
@@ -681,8 +688,50 @@ header h1 {
     color: white;
 }
 
-.admin-year-new {
+.admin-year-create {
     margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+}
+
+.admin-year-create label {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.admin-year-create input {
+    width: 4.5rem;
+    padding: 0.15rem 0.3rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font: inherit;
+}
+
+.admin-year-create button {
+    padding: 0.15rem 0.5rem;
+    background: #1f6f4d;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font: inherit;
+}
+
+.admin-year-create button:hover {
+    background: #175939;
+}
+
+.admin-year-create button.admin-year-empty {
+    background: none;
+    color: #1f6f4d;
+    border: 1px solid #1f6f4d;
+}
+
+.admin-year-create button.admin-year-empty:hover {
+    background: #dcece3;
 }
 
 .admin-form-hint-highlight {

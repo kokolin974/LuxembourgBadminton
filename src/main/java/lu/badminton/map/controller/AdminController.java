@@ -107,6 +107,23 @@ public class AdminController {
         return "redirect:/admin/clubs?year=" + targetYear;
     }
 
+    // Creates a year. With `copyFromYear` set, every club's snapshot from that
+    // year is copied into the new year (clubs already present in the target
+    // year are left as-is). With `startEmpty`, it just lands on that year's
+    // (empty) admin page with the "Add a club" form pre-set to it.
+    @PostMapping("/years")
+    public String createYear(@RequestParam int year,
+                              @RequestParam(required = false) Integer copyFromYear,
+                              @RequestParam(required = false) Boolean startEmpty) {
+        if (year < 2000 || year > 2100) {
+            return "redirect:/admin/clubs";
+        }
+        if (copyFromYear != null && !Boolean.TRUE.equals(startEmpty)) {
+            clubService.copyYear(copyFromYear, year);
+        }
+        return "redirect:/admin/clubs?year=" + year;
+    }
+
     @PostMapping("/{id}/years/{year}/update")
     public String update(@PathVariable Long id, @PathVariable int year, @ModelAttribute ClubForm form) {
         Club club = clubService.findClub(id);
@@ -116,7 +133,10 @@ public class AdminController {
     }
 
     private void saveYearFromForm(Club club, int year, ClubForm form) {
-        Level level = levelRepository.findById(form.getLevelId()).orElse(null);
+        // levelId is null when "— No level —" is picked in the form.
+        Level level = form.getLevelId() != null
+                ? levelRepository.findById(form.getLevelId()).orElse(null)
+                : null;
         ClubYear clubYear = clubService.findYearRow(club.getId(), year).orElseGet(() ->
                 new ClubYear(club, year, null, null, null, null, null, null, null, null));
         clubYear.setClub(club);

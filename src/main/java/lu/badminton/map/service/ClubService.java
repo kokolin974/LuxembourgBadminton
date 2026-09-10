@@ -9,8 +9,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class ClubService {
@@ -116,6 +118,39 @@ public class ClubService {
 
     public ClubYear saveYear(ClubYear clubYear) {
         return clubYearRepository.save(clubYear);
+    }
+
+    // Bulk-creates a snapshot for `toYear` by copying every club's `fromYear`
+    // snapshot (all fields). Clubs that already have a `toYear` row are left
+    // untouched — this only fills in the ones that are missing. Returns how
+    // many rows were created.
+    @Transactional
+    public int copyYear(int fromYear, int toYear) {
+        if (fromYear == toYear) {
+            return 0;
+        }
+        Set<Long> alreadyInTarget = new HashSet<>();
+        for (ClubYear existing : clubYearRepository.findByYear(toYear)) {
+            alreadyInTarget.add(existing.getClub().getId());
+        }
+
+        int created = 0;
+        for (ClubYear source : clubYearRepository.findByYear(fromYear)) {
+            if (alreadyInTarget.contains(source.getClub().getId())) {
+                continue;
+            }
+            ClubYear copy = new ClubYear(
+                    source.getClub(), toYear,
+                    source.getMembership(), source.getClubActivities(), source.getHumanResources(),
+                    source.getFinance(), source.getCommunication(), source.getGovernance(),
+                    source.getVisionStrategy(), source.getLevel());
+            copy.setRadiusOverrideKm(source.getRadiusOverrideKm());
+            copy.setFiliere(source.getFiliere());
+            copy.setOverlayPositions(source.getOverlayPositions());
+            clubYearRepository.save(copy);
+            created++;
+        }
+        return created;
     }
 
     // Removes just this one year's snapshot — if it was the club's only (or

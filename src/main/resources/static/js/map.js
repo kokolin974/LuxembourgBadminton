@@ -365,18 +365,22 @@ function levelSizeFactor(level) {
     return LEVEL_SIZE_FACTOR_MIN + (LEVEL_SIZE_FACTOR_MAX - LEVEL_SIZE_FACTOR_MIN) * t;
 }
 
+// The name label is a fixed size for every marker — it does NOT scale with
+// the house icon (which varies by zoom and level). Full name, wrapped: the
+// box is wide enough that most names take two lines; longer ones wrap
+// further and overflow the declared icon height downward (visible, though
+// only the first line stays clickable).
+const MARKER_LABEL_FONT_PX = 10;
+const MARKER_LABEL_WIDTH_PX = 130;
+const MARKER_LABEL_LINE_HEIGHT_PX = Math.round(MARKER_LABEL_FONT_PX * 1.35) + 3;
+
 function iconForClub(club, baseSize) {
     const url = club.level ? `/img/clubLevel${club.level.level}.png` : DEFAULT_ICON_URL;
     const size = Math.round(baseSize * levelSizeFactor(club.level));
 
-    // Name label sits below the house, inside the same divIcon (so clicking
-    // it triggers the marker's own click handler, same as clicking the
-    // house) — sized off the icon so it scales along with level/zoom, with
-    // a wider box than the icon itself so short names don't wrap and long
-    // ones ellipsize instead of overlapping neighboring markers.
-    const labelFontSize = Math.max(9, Math.round(size * 0.28));
-    const labelWidth = Math.max(size * 2.4, 70);
-    const labelHeight = Math.round(labelFontSize * 1.35) + 3;
+    const labelFontSize = MARKER_LABEL_FONT_PX;
+    const labelWidth = MARKER_LABEL_WIDTH_PX;
+    const labelHeight = MARKER_LABEL_LINE_HEIGHT_PX;
     const name = escapeHtml(club.name);
     const suggestedClass = suggestedClubIds.has(club.id) ? ' club-marker-wrap--suggested' : '';
 
@@ -637,9 +641,16 @@ let allMarkers = [];
 // filtered-out clubs stay hidden.
 let selectedLevels = new Set();
 
+// Filières currently checked. Every club falls in exactly one bucket: its
+// filière string, or NO_FILIERE when it has none.
+const NO_FILIERE = 'No filière';
+let selectedFilieres = new Set();
+
 function markerPassesFilter(marker) {
     const level = marker.club.level;
-    return !level || selectedLevels.has(level.level);
+    const levelOk = !level || selectedLevels.has(level.level);
+    const filiereOk = selectedFilieres.has(marker.club.filiere || NO_FILIERE);
+    return levelOk && filiereOk;
 }
 
 function applyFilter() {
@@ -885,20 +896,30 @@ function spreadOverlappingClubs(clubs) {
 
 const levelFilter = document.getElementById('level-filter');
 
-function renderLevelFilter(levels) {
-    const checkboxes = levels.map(level => `
+function renderLevelFilter(levels, filieres) {
+    const levelCheckboxes = levels.map(level => `
         <label>
             <input type="checkbox" class="level-filter-checkbox" value="${level.level}" checked/>
             ${level.level} - ${escapeHtml(level.label)}
         </label>
     `).join('');
+
+    const filiereCheckboxes = filieres.map((filiere, index) => `
+        <label>
+            <input type="checkbox" class="filiere-filter-checkbox" data-filiere-index="${index}" checked/>
+            ${escapeHtml(filiere)}
+        </label>
+    `).join('');
+
     levelFilter.innerHTML = `
         <h3>Filter by level</h3>
-        ${checkboxes}
+        ${levelCheckboxes}
         <div class="level-filter-actions">
             <button type="button" id="level-filter-all">All</button>
             <button type="button" id="level-filter-none">None</button>
         </div>
+        <h3 class="level-filter-subhead">Filter by filière</h3>
+        ${filiereCheckboxes}
         <label class="heatmap-toggle-label">
             <input type="checkbox" id="heatmap-toggle"/>
             Show coverage
@@ -922,6 +943,20 @@ function renderLevelFilter(levels) {
                 selectedLevels.add(value);
             } else {
                 selectedLevels.delete(value);
+            }
+            applyFilter();
+        });
+    });
+
+    // data-filiere-index rather than value=, so a filière string with an
+    // awkward character can't break the checkbox markup.
+    levelFilter.querySelectorAll('.filiere-filter-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', () => {
+            const filiere = filieres[parseInt(checkbox.dataset.filiereIndex, 10)];
+            if (checkbox.checked) {
+                selectedFilieres.add(filiere);
+            } else {
+                selectedFilieres.delete(filiere);
             }
             applyFilter();
         });
@@ -1257,7 +1292,15 @@ Promise.all([
 ])
     .then(([levels, years, history]) => {
         selectedLevels = new Set(levels.map(level => level.level));
-        renderLevelFilter(levels);
+
+        // Filière options: every distinct value that appears in any year,
+        // plus the "no filière" bucket. Fixed list, like levels — not
+        // recomputed per year.
+        const filieres = [...new Set(history.map(club => club.filiere).filter(Boolean))].sort();
+        filieres.push(NO_FILIERE);
+        selectedFilieres = new Set(filieres);
+
+        renderLevelFilter(levels, filieres);
         renderClubFinder();
 
         history.forEach(club => {
