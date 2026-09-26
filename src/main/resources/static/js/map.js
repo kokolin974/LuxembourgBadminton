@@ -412,12 +412,35 @@ function escapeHtml(value) {
 const LEVELS = [
     { field: 'visionStrategy', cssClass: 'ov-vision-strategy' },
     { field: 'governance', cssClass: 'ov-governance' },
-    { field: 'communication', cssClass: 'ov-communication' },
+    // Communication has no single text field — it's 4 separate optional
+    // links, rendered as clickable <a> tags instead of bullet-list text
+    // (see communicationLinksHtml). "field" here only names the overlay's
+    // drag-position slot, matching the others.
+    { field: 'communication', cssClass: 'ov-communication', isCommunication: true },
     { field: 'finance', cssClass: 'ov-finance' },
     { field: 'humanResources', cssClass: 'ov-human-resources' },
     { field: 'clubActivities', cssClass: 'ov-club-activities' },
     { field: 'membership', cssClass: 'ov-membership' }
 ];
+
+// Builds the Communication level's content: one clickable link per channel
+// the club actually has, skipping the rest. Email becomes a mailto: link.
+function communicationLinksHtml(club) {
+    const links = [];
+    if (club.communicationEmail) {
+        links.push({ label: 'Email', href: `mailto:${club.communicationEmail}` });
+    }
+    if (club.communicationWebsite) {
+        links.push({ label: 'Website', href: club.communicationWebsite });
+    }
+    if (club.communicationInstagram) {
+        links.push({ label: 'Instagram', href: club.communicationInstagram });
+    }
+    if (club.communicationFacebook) {
+        links.push({ label: 'Facebook', href: club.communicationFacebook });
+    }
+    return links;
+}
 
 // Saved drag positions come back from the API as a JSON string (see
 // Club.overlayPositions) — {"governance": {"left": 52.3, "top": 30.1}, ...}.
@@ -441,11 +464,24 @@ function parseOverlayPositions(club) {
 function levelOverlaysHtml(club) {
     const positions = parseOverlayPositions(club);
     return LEVELS.map(level => {
-        const text = club[level.field];
         const saved = positions[level.field];
         const styleAttr = saved
             ? ` style="left:${saved.left}%; top:${saved.top}%; right:auto;"`
             : '';
+
+        if (level.isCommunication) {
+            const links = communicationLinksHtml(club);
+            if (links.length === 0) {
+                return `<div class="club-overlay ${level.cssClass}" data-field="${level.field}"${styleAttr}></div>`;
+            }
+            const content = `<ul>${links.map(l =>
+                `<li><a href="${escapeHtml(l.href)}" target="_blank" rel="noopener noreferrer">${l.label}</a></li>`
+            ).join('')}</ul>`;
+            const tooltip = escapeHtml(links.map(l => l.label).join(', '));
+            return `<div class="club-overlay ${level.cssClass}" data-field="${level.field}"${styleAttr} title="${tooltip}">${content}</div>`;
+        }
+
+        const text = club[level.field];
         if (!text) {
             return `<div class="club-overlay ${level.cssClass}" data-field="${level.field}"${styleAttr}></div>`;
         }
@@ -778,6 +814,12 @@ function makeOverlayDraggable(el, wrapEl, club) {
     let finalLeftPct, finalTopPct;
 
     el.addEventListener('pointerdown', event => {
+        // The Communication block contains real links — let a click on one
+        // of them navigate normally instead of starting a drag (which would
+        // otherwise preventDefault the pointerdown and swallow the click).
+        if (event.target.closest('a')) {
+            return;
+        }
         dragging = true;
         try {
             el.setPointerCapture(event.pointerId);

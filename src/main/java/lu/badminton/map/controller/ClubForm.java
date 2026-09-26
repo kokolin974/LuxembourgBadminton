@@ -12,7 +12,10 @@ public class ClubForm {
     private String clubActivities;
     private String humanResources;
     private String finance;
-    private String communication;
+    private String communicationEmail;
+    private String communicationWebsite;
+    private String communicationInstagram;
+    private String communicationFacebook;
     private String governance;
     private String visionStrategy;
     private Integer levelId;
@@ -84,12 +87,36 @@ public class ClubForm {
         this.finance = finance;
     }
 
-    public String getCommunication() {
-        return communication;
+    public String getCommunicationEmail() {
+        return communicationEmail;
     }
 
-    public void setCommunication(String communication) {
-        this.communication = communication;
+    public void setCommunicationEmail(String communicationEmail) {
+        this.communicationEmail = communicationEmail;
+    }
+
+    public String getCommunicationWebsite() {
+        return communicationWebsite;
+    }
+
+    public void setCommunicationWebsite(String communicationWebsite) {
+        this.communicationWebsite = communicationWebsite;
+    }
+
+    public String getCommunicationInstagram() {
+        return communicationInstagram;
+    }
+
+    public void setCommunicationInstagram(String communicationInstagram) {
+        this.communicationInstagram = communicationInstagram;
+    }
+
+    public String getCommunicationFacebook() {
+        return communicationFacebook;
+    }
+
+    public void setCommunicationFacebook(String communicationFacebook) {
+        this.communicationFacebook = communicationFacebook;
     }
 
     public String getGovernance() {

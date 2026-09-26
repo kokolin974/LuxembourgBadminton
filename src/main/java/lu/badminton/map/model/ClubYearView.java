@@ -16,7 +16,10 @@ public class ClubYearView {
     private final String clubActivities;
     private final String humanResources;
     private final String finance;
-    private final String communication;
+    private final String communicationEmail;
+    private final String communicationWebsite;
+    private final String communicationInstagram;
+    private final String communicationFacebook;
     private final String governance;
     private final String visionStrategy;
     private final Level level;
@@ -36,7 +39,10 @@ public class ClubYearView {
         this.clubActivities = clubYear.getClubActivities();
         this.humanResources = clubYear.getHumanResources();
         this.finance = clubYear.getFinance();
-        this.communication = clubYear.getCommunication();
+        this.communicationEmail = clubYear.getCommunicationEmail();
+        this.communicationWebsite = clubYear.getCommunicationWebsite();
+        this.communicationInstagram = clubYear.getCommunicationInstagram();
+        this.communicationFacebook = clubYear.getCommunicationFacebook();
         this.governance = clubYear.getGovernance();
         this.visionStrategy = clubYear.getVisionStrategy();
         this.level = clubYear.getLevel();
@@ -90,8 +96,20 @@ public class ClubYearView {
         return finance;
     }
 
-    public String getCommunication() {
-        return communication;
+    public String getCommunicationEmail() {
+        return communicationEmail;
+    }
+
+    public String getCommunicationWebsite() {
+        return communicationWebsite;
+    }
+
+    public String getCommunicationInstagram() {
+        return communicationInstagram;
+    }
+
+    public String getCommunicationFacebook() {
+        return communicationFacebook;
     }
 
     public String getGovernance() {

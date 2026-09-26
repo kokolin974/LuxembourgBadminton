@@ -111,10 +111,25 @@
                     Finance
                     <textarea th:field="*{finance}" rows="2"></textarea>
                 </label>
-                <label class="level-communication">
-                    Communication
-                    <textarea th:field="*{communication}" rows="2"></textarea>
-                </label>
+                <div class="level-communication admin-form-group">
+                    <span class="admin-form-group-label">Communication</span>
+                    <label>
+                        Email
+                        <input type="email" th:field="*{communicationEmail}" placeholder="e.g. club@example.lu"/>
+                    </label>
+                    <label>
+                        Website
+                        <input type="url" th:field="*{communicationWebsite}" placeholder="https://…"/>
+                    </label>
+                    <label>
+                        Instagram
+                        <input type="url" th:field="*{communicationInstagram}" placeholder="https://instagram.com/…"/>
+                    </label>
+                    <label>
+                        Facebook
+                        <input type="url" th:field="*{communicationFacebook}" placeholder="https://facebook.com/…"/>
+                    </label>
+                </div>
                 <label class="level-governance">
                     Governance
                     <textarea th:field="*{governance}" rows="2"></textarea>
@@ -168,5 +183,27 @@
             </table>
         </section>
     </main>
+
+    <section class="admin-data-transfer">
+        <h2>Backup / transfer</h2>
+        <p class="admin-form-hint">
+            One JSON file with everything — levels, every club, all year snapshots and schedules.
+            Use it to back up, or to move data between installations (works the same on the local
+            build and a hosted one).
+        </p>
+
+        <p th:if="${importMessage}" th:text="${importMessage}" class="admin-data-ok"></p>
+        <p th:if="${importError}" th:text="${importError}" class="admin-data-err"></p>
+
+        <div class="admin-data-actions">
+            <a th:href="@{/admin/export}" class="admin-data-export">Export all data</a>
+
+            <form th:action="@{/admin/import}" method="post" enctype="multipart/form-data"
+                  onsubmit="return confirm('This REPLACES all clubs, year snapshots and schedules with the contents of the file. This cannot be undone. Continue?');">
+                <input type="file" name="file" accept="application/json,.json" required/>
+                <button type="submit">Import (replace everything)</button>
+            </form>
+        </div>
+    </section>
 </body>
 </html>

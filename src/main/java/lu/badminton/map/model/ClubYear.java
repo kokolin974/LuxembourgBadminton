@@ -45,8 +45,18 @@ public class ClubYear {
     @Column(length = 2000)
     private String finance;
 
-    @Column(length = 2000)
-    private String communication;
+    // Communication is 4 distinct optional links rather than one text blob
+    // (unlike the other house levels) — each one needs to render as its own
+    // clickable link on the map, not just be read as prose. Email is stored
+    // bare (no "mailto:") so it displays the same way admin-side as the
+    // others; the map builds the mailto: link when rendering.
+    private String communicationEmail;
+
+    private String communicationWebsite;
+
+    private String communicationInstagram;
+
+    private String communicationFacebook;
 
     @Column(length = 2000)
     private String governance;
@@ -78,14 +88,13 @@ public class ClubYear {
     }
 
     public ClubYear(Club club, int year, String membership, String clubActivities, String humanResources,
-                     String finance, String communication, String governance, String visionStrategy, Level level) {
+                     String finance, String governance, String visionStrategy, Level level) {
         this.club = club;
         this.year = year;
         this.membership = membership;
         this.clubActivities = clubActivities;
         this.humanResources = humanResources;
         this.finance = finance;
-        this.communication = communication;
         this.governance = governance;
         this.visionStrategy = visionStrategy;
         this.level = level;
@@ -143,12 +152,36 @@ public class ClubYear {
         this.finance = finance;
     }
 
-    public String getCommunication() {
-        return communication;
+    public String getCommunicationEmail() {
+        return communicationEmail;
     }
 
-    public void setCommunication(String communication) {
-        this.communication = communication;
+    public void setCommunicationEmail(String communicationEmail) {
+        this.communicationEmail = communicationEmail;
+    }
+
+    public String getCommunicationWebsite() {
+        return communicationWebsite;
+    }
+
+    public void setCommunicationWebsite(String communicationWebsite) {
+        this.communicationWebsite = communicationWebsite;
+    }
+
+    public String getCommunicationInstagram() {
+        return communicationInstagram;
+    }
+
+    public void setCommunicationInstagram(String communicationInstagram) {
+        this.communicationInstagram = communicationInstagram;
+    }
+
+    public String getCommunicationFacebook() {
+        return communicationFacebook;
+    }
+
+    public void setCommunicationFacebook(String communicationFacebook) {
+        this.communicationFacebook = communicationFacebook;
     }
 
     public String getGovernance() {

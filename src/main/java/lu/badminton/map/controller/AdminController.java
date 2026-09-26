@@ -80,7 +80,10 @@ public class AdminController {
             form.setClubActivities(source.getClubActivities());
             form.setHumanResources(source.getHumanResources());
             form.setFinance(source.getFinance());
-            form.setCommunication(source.getCommunication());
+            form.setCommunicationEmail(source.getCommunicationEmail());
+            form.setCommunicationWebsite(source.getCommunicationWebsite());
+            form.setCommunicationInstagram(source.getCommunicationInstagram());
+            form.setCommunicationFacebook(source.getCommunicationFacebook());
             form.setGovernance(source.getGovernance());
             form.setVisionStrategy(source.getVisionStrategy());
             form.setLevelId(source.getLevel() != null ? source.getLevel().getLevel() : null);
@@ -138,14 +141,17 @@ public class AdminController {
                 ? levelRepository.findById(form.getLevelId()).orElse(null)
                 : null;
         ClubYear clubYear = clubService.findYearRow(club.getId(), year).orElseGet(() ->
-                new ClubYear(club, year, null, null, null, null, null, null, null, null));
+                new ClubYear(club, year, null, null, null, null, null, null, null));
         clubYear.setClub(club);
         clubYear.setYear(year);
         clubYear.setMembership(form.getMembership());
         clubYear.setClubActivities(form.getClubActivities());
         clubYear.setHumanResources(form.getHumanResources());
         clubYear.setFinance(form.getFinance());
-        clubYear.setCommunication(form.getCommunication());
+        clubYear.setCommunicationEmail(form.getCommunicationEmail());
+        clubYear.setCommunicationWebsite(form.getCommunicationWebsite());
+        clubYear.setCommunicationInstagram(form.getCommunicationInstagram());
+        clubYear.setCommunicationFacebook(form.getCommunicationFacebook());
         clubYear.setGovernance(form.getGovernance());
         clubYear.setVisionStrategy(form.getVisionStrategy());
         clubYear.setLevel(level);

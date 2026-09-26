@@ -142,11 +142,15 @@ public class ClubService {
             ClubYear copy = new ClubYear(
                     source.getClub(), toYear,
                     source.getMembership(), source.getClubActivities(), source.getHumanResources(),
-                    source.getFinance(), source.getCommunication(), source.getGovernance(),
+                    source.getFinance(), source.getGovernance(),
                     source.getVisionStrategy(), source.getLevel());
             copy.setRadiusOverrideKm(source.getRadiusOverrideKm());
             copy.setFiliere(source.getFiliere());
             copy.setOverlayPositions(source.getOverlayPositions());
+            copy.setCommunicationEmail(source.getCommunicationEmail());
+            copy.setCommunicationWebsite(source.getCommunicationWebsite());
+            copy.setCommunicationInstagram(source.getCommunicationInstagram());
+            copy.setCommunicationFacebook(source.getCommunicationFacebook());
             clubYearRepository.save(copy);
             created++;
         }

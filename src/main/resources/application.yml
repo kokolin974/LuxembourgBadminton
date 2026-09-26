@@ -7,6 +7,12 @@ spring:
     hibernate:
       ddl-auto: update
     open-in-view: false
+  servlet:
+    multipart:
+      # Data-import upload (see DataTransferController) — generous headroom
+      # for a large export.
+      max-file-size: 25MB
+      max-request-size: 25MB
 
 server:
   port: 8080

@@ -93,15 +93,14 @@ public class DataSeeder {
                         clubActivitiesText(record.get("2_equipeInterclubJeune"), record.get("2_equipeInterclubSenior"), record.get("2_cadresTotal")),
                         humanResourcesText(record.get("3_nomResponsable"), record.get("3_entraineurProClub"), record.get("3_officielTechnique")),
                         financeText(record.get("4_cotisationJeune"), record.get("4_cotisationAdulte"), record.get("4_cotisationHobby")),
-                        communicationText(
-                                Boolean.parseBoolean(record.get("5_hasEmail")),
-                                Boolean.parseBoolean(record.get("5_hasWebsite")),
-                                Boolean.parseBoolean(record.get("5_hasInstagram")),
-                                Boolean.parseBoolean(record.get("5_hasFacebook"))),
                         governanceText(record.get("6_levelOld"), record.get("6_filiere"), record.get("6_levelNew")),
                         null, // Vision & Strategy — no source data yet
                         level);
                 clubYear.setFiliere(blankToNull(record.get("6_filiere")));
+                clubYear.setCommunicationEmail(blankToNull(record.get("5_email")));
+                clubYear.setCommunicationWebsite(blankToNull(record.get("5_website")));
+                clubYear.setCommunicationInstagram(blankToNull(record.get("5_instagram")));
+                clubYear.setCommunicationFacebook(blankToNull(record.get("5_facebook")));
                 clubYearRepository.save(clubYear);
             }
         }
@@ -169,28 +168,6 @@ public class DataSeeder {
             return "Membership fees not published";
         }
         return "Youth: €" + jeune + "\nAdult: €" + adulte + "\nHobby: €" + hobby;
-    }
-
-    private static String communicationText(boolean email, boolean website, boolean instagram, boolean facebook) {
-        List<String> present = new ArrayList<>();
-        if (email) present.add("email");
-        if (website) present.add("website");
-        if (instagram) present.add("Instagram");
-        if (facebook) present.add("Facebook");
-        if (present.isEmpty()) {
-            return "No contact channels on file";
-        }
-
-        List<String> lines = new ArrayList<>();
-        lines.add("Available: " + String.join(", ", present));
-        List<String> missing = new ArrayList<>();
-        if (!website) missing.add("website");
-        if (!instagram) missing.add("Instagram");
-        if (!facebook) missing.add("Facebook");
-        if (!missing.isEmpty()) {
-            lines.add("Not available: " + String.join(", ", missing));
-        }
-        return String.join("\n", lines);
     }
 
     private static String governanceText(String levelOld, String filiere, String levelNew) {

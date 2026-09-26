@@ -653,6 +653,18 @@ header h1 {
     left: -1em;
 }
 
+/* Communication's links — same halo treatment as the surrounding text, but
+   colored and underlined so they read as clickable rather than plain prose. */
+.club-overlay a {
+    color: var(--level-communication);
+    font-weight: 600;
+    text-decoration: underline;
+}
+
+.club-overlay a:hover {
+    text-decoration: none;
+}
+
 .club-overlay.ov-vision-strategy { top: 17%; left: 30%; right: 30%; font-weight: 600; }
 .club-overlay.ov-governance { top: 24%; }
 .club-overlay.ov-communication { top: 34%; }
@@ -814,9 +826,23 @@ header h1 {
 .admin-form label.level-club-activities { border-left: 4px solid var(--level-club-activities); padding-left: 0.5rem; }
 .admin-form label.level-human-resources { border-left: 4px solid var(--level-human-resources); padding-left: 0.5rem; }
 .admin-form label.level-finance { border-left: 4px solid var(--level-finance); padding-left: 0.5rem; }
-.admin-form label.level-communication { border-left: 4px solid var(--level-communication); padding-left: 0.5rem; }
+.admin-form div.level-communication { border-left: 4px solid var(--level-communication); padding-left: 0.5rem; }
 .admin-form label.level-governance { border-left: 4px solid var(--level-governance); padding-left: 0.5rem; }
 .admin-form label.level-vision-strategy { border-left: 4px solid var(--level-vision-strategy); padding-left: 0.5rem; }
+
+/* Communication is the one house level with 4 separate fields (email,
+   website, Instagram, Facebook) instead of one free-text box, so it needs
+   its own small stack rather than a single .admin-form label. */
+.admin-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.admin-form-group-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+}
 
 .admin-form button {
     align-self: flex-start;
@@ -884,4 +910,73 @@ header h1 {
     font-size: 0.75rem;
     color: #777;
     margin-left: 0.25rem;
+}
+
+.admin-data-transfer {
+    max-width: 1100px;
+    margin: 0 auto 3rem auto;
+    padding: 1.25rem 1rem 0 1rem;
+    border-top: 1px solid #e0e0e0;
+}
+
+.admin-data-transfer h2 {
+    font-size: 1.05rem;
+    color: #1f6f4d;
+}
+
+.admin-data-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1.5rem;
+    margin-top: 0.75rem;
+}
+
+.admin-data-actions form {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.admin-data-export,
+.admin-data-actions button {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    background: #1f6f4d;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    font: inherit;
+}
+
+.admin-data-export:hover,
+.admin-data-actions button:hover {
+    background: #175939;
+}
+
+.admin-data-actions button {
+    background: #b0462f;
+}
+
+.admin-data-actions button:hover {
+    background: #8f3826;
+}
+
+.admin-data-ok {
+    background: #e3f1e8;
+    color: #1f6f4d;
+    border: 1px solid #9fcbb2;
+    border-radius: 4px;
+    padding: 0.5rem 0.75rem;
+}
+
+.admin-data-err {
+    background: #f7e4e1;
+    color: #a23b32;
+    border: 1px solid #e0aaa1;
+    border-radius: 4px;
+    padding: 0.5rem 0.75rem;
 }
