@@ -552,31 +552,32 @@ header h1 {
 }
 
 .club-radius {
-    margin-bottom: 1.25rem;
-    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+    padding: 0.4rem 0.6rem;
     background: #f4f7f5;
     border-radius: 6px;
 }
 
 .club-radius label {
     display: block;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: #333;
-    margin-bottom: 0.4rem;
+    margin-bottom: 0.15rem;
 }
 
 .club-radius input[type="range"] {
     width: 100%;
+    display: block;
 }
 
 .club-radius-reset {
-    margin-top: 0.5rem;
+    margin-top: 0.25rem;
     background: none;
     border: 1px solid #1f6f4d;
     color: #1f6f4d;
     border-radius: 4px;
-    padding: 0.25rem 0.6rem;
-    font-size: 0.78rem;
+    padding: 0.15rem 0.5rem;
+    font-size: 0.72rem;
     cursor: pointer;
 }
 
@@ -591,7 +592,12 @@ header h1 {
 
 .club-house-wrap {
     position: relative;
-    width: 100%;
+    /* Bleeds past .club-panel's 1.25rem side padding out to the panel's true
+       edges — the only way to make the house image bigger without changing
+       the panel's own width, since the image is already 100% of the content
+       area. A modest gain (~6-8% wider on the current panel size). */
+    width: calc(100% + 2.5rem);
+    margin-left: -1.25rem;
 }
 
 .club-house-img {
@@ -659,6 +665,13 @@ header h1 {
     color: var(--level-communication);
     font-weight: 600;
     text-decoration: underline;
+    /* Links are natively draggable in browsers (e.g. onto the bookmarks
+       bar) — that built-in drag hijacks a press-and-move gesture that
+       starts on the link text, competing with the custom drag-to-reposition
+       handler on the overlay. Disabling it is what actually lets both
+       "click to open" and "drag to reposition" work from the same text. */
+    -webkit-user-drag: none;
+    user-drag: none;
 }
 
 .club-overlay a:hover {

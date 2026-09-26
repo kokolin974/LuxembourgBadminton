@@ -475,7 +475,7 @@ function levelOverlaysHtml(club) {
                 return `<div class="club-overlay ${level.cssClass}" data-field="${level.field}"${styleAttr}></div>`;
             }
             const content = `<ul>${links.map(l =>
-                `<li><a href="${escapeHtml(l.href)}" target="_blank" rel="noopener noreferrer">${l.label}</a></li>`
+                `<li><a href="${escapeHtml(l.href)}" target="_blank" rel="noopener noreferrer" draggable="false">${l.label}</a></li>`
             ).join('')}</ul>`;
             const tooltip = escapeHtml(links.map(l => l.label).join(', '));
             return `<div class="club-overlay ${level.cssClass}" data-field="${level.field}"${styleAttr} title="${tooltip}">${content}</div>`;
@@ -809,56 +809,78 @@ function wireRadiusControl(club) {
 // position for every club. Saved on drop via PATCH .../overlay-positions, so
 // it's still there next time this club's panel is opened.
 function makeOverlayDraggable(el, wrapEl, club) {
+    // Drag vs. click is told apart by actual pointer movement, not by what's
+    // under the cursor — the Communication block is entirely links (Email/
+    // Website/Instagram/Facebook), so "is this a link?" would always say
+    // yes and the block could never be dragged. A short press-and-release
+    // with no movement reaches the browser as an ordinary click (so a link
+    // still navigates); movement past DRAG_THRESHOLD_PX becomes a drag, and
+    // the click that the browser fires right after releasing a real drag is
+    // swallowed so it doesn't also trigger a link underneath.
+    const DRAG_THRESHOLD_PX = 4;
+    let pointerId = null;
     let dragging = false;
+    let suppressNextClick = false;
     let startX, startY, startLeftPct, startTopPct;
     let finalLeftPct, finalTopPct;
 
     el.addEventListener('pointerdown', event => {
-        // The Communication block contains real links — let a click on one
-        // of them navigate normally instead of starting a drag (which would
-        // otherwise preventDefault the pointerdown and swallow the click).
-        if (event.target.closest('a')) {
-            return;
-        }
-        dragging = true;
-        try {
-            el.setPointerCapture(event.pointerId);
-        } catch (err) {
-            // Capture is a nice-to-have (keeps the drag going if the pointer
-            // strays outside the element); losing it shouldn't abort the
-            // rest of this handler and leave the start position unset.
-        }
+        pointerId = event.pointerId;
+        dragging = false;
         startX = event.clientX;
         startY = event.clientY;
         const wrapRect = wrapEl.getBoundingClientRect();
         const elRect = el.getBoundingClientRect();
         startLeftPct = ((elRect.left - wrapRect.left) / wrapRect.width) * 100;
         startTopPct = ((elRect.top - wrapRect.top) / wrapRect.height) * 100;
-        event.preventDefault();
     });
 
     el.addEventListener('pointermove', event => {
-        if (!dragging) {
+        if (pointerId === null || event.pointerId !== pointerId) {
             return;
         }
+        const dx = event.clientX - startX;
+        const dy = event.clientY - startY;
+        if (!dragging) {
+            if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) {
+                return; // still might just be a click/tap — don't commit yet
+            }
+            dragging = true;
+            // Only grab capture once this is confirmed to be a real drag —
+            // doing it on pointerdown unconditionally risked retargeting the
+            // click a plain tap on a link relies on to navigate.
+            try {
+                el.setPointerCapture(pointerId);
+            } catch (err) {
+                // Capture is a nice-to-have (keeps the drag going if the
+                // pointer strays outside the element); losing it shouldn't
+                // abort the rest of this handler.
+            }
+        }
+        event.preventDefault();
         const wrapRect = wrapEl.getBoundingClientRect();
-        const deltaLeftPct = ((event.clientX - startX) / wrapRect.width) * 100;
-        const deltaTopPct = ((event.clientY - startY) / wrapRect.height) * 100;
-        finalLeftPct = startLeftPct + deltaLeftPct;
-        finalTopPct = startTopPct + deltaTopPct;
+        finalLeftPct = startLeftPct + (dx / wrapRect.width) * 100;
+        finalTopPct = startTopPct + (dy / wrapRect.height) * 100;
         el.style.left = `${finalLeftPct}%`;
         el.style.top = `${finalTopPct}%`;
         el.style.right = 'auto';
     });
 
-    el.addEventListener('pointerup', () => {
-        const wasDragging = dragging;
-        dragging = false;
-        // A plain click (no pointermove in between) never set final*Pct —
-        // nothing actually moved, so there's nothing new to save.
-        if (!wasDragging || finalLeftPct === undefined) {
+    el.addEventListener('pointerup', event => {
+        if (pointerId === null || event.pointerId !== pointerId) {
             return;
         }
+        pointerId = null;
+        // A plain click (no pointermove past the threshold) never set
+        // final*Pct — nothing actually moved, so there's nothing to save,
+        // and any link under the pointer navigates as normal.
+        if (!dragging || finalLeftPct === undefined) {
+            dragging = false;
+            return;
+        }
+        dragging = false;
+        suppressNextClick = true;
+
         const positions = parseOverlayPositions(club);
         positions[el.dataset.field] = { left: finalLeftPct, top: finalTopPct };
         club.overlayPositions = JSON.stringify(positions);
@@ -869,6 +891,33 @@ function makeOverlayDraggable(el, wrapEl, club) {
             body: JSON.stringify(positions)
         }).catch(err => console.error('Failed to save overlay position', err));
     });
+
+    // Belt-and-braces alongside the `buttons === 0` check above — if the
+    // browser cancels the gesture outright (another way pointerup can fail
+    // to arrive), drop any in-progress drag without saving a position.
+    el.addEventListener('pointercancel', event => {
+        if (pointerId === null || event.pointerId !== pointerId) {
+            return;
+        }
+        pointerId = null;
+        dragging = false;
+    });
+
+    // Capture phase, so this runs before a link's own navigation — swallows
+    // the click the browser fires right after releasing a real drag.
+    el.addEventListener('click', event => {
+        if (suppressNextClick) {
+            suppressNextClick = false;
+            event.preventDefault();
+            event.stopPropagation();
+        }
+    }, true);
+
+    // Belt-and-suspenders for the CSS user-drag:none on links (support for
+    // that property varies) — a link's native browser drag-and-drop would
+    // otherwise hijack a press-and-move gesture starting on its text,
+    // pre-empting the custom drag handling above.
+    el.addEventListener('dragstart', event => event.preventDefault());
 }
 
 function openClubPanel(club, marker) {
