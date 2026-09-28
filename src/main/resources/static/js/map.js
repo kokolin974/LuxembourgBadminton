@@ -923,11 +923,13 @@ function makeOverlayDraggable(el, wrapEl, club) {
 function openClubPanel(club, marker) {
     panelContent.innerHTML = `
         <div class="club-house">
-            <h2>${escapeHtml(club.name)} — ${escapeHtml(club.city)}</h2>
-            ${radiusControlHtml(club)}
             <div class="club-house-wrap">
                 <img class="club-house-img" src="/img/discovery_house_clean.svg" alt="Club levels diagram"/>
                 ${levelOverlaysHtml(club)}
+                <div class="club-house-header">
+                    <h2>${escapeHtml(club.name)} — ${escapeHtml(club.city)}</h2>
+                    ${radiusControlHtml(club)}
+                </div>
             </div>
         </div>
     `;
