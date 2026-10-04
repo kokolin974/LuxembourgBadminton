@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/club-suggestions")
 public class SuggestionController {
@@ -28,8 +30,10 @@ public class SuggestionController {
                                                        @RequestParam(required = false) Double lat,
                                                        @RequestParam(required = false) Double lon,
                                                        @RequestParam(required = false) String label,
-                                                       @RequestParam(required = false) Integer year) {
-        return suggestionService.suggest(address, lat, lon, label, year)
+                                                       @RequestParam(required = false) Integer year,
+                                                       @RequestParam(required = false) String type,
+                                                       @RequestParam(required = false) List<String> days) {
+        return suggestionService.suggest(address, lat, lon, label, year, type, days)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
     }

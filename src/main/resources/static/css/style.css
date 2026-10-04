@@ -111,6 +111,47 @@ header h1 {
     background: #175939;
 }
 
+/* Hobby / Competition and training-day selectors under the address field.
+   Chips are toggles (outline when off, solid green when on); the .club-finder
+   prefix is needed to beat the blanket ".club-finder button" green style. */
+.finder-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.finder-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.finder-days-label {
+    font-size: 0.7rem;
+    color: #666;
+    margin-top: 0.1rem;
+}
+
+.club-finder .finder-chip {
+    align-self: auto;
+    padding: 0.15rem 0.45rem;
+    background: white;
+    color: #1f6f4d;
+    border: 1px solid #1f6f4d;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    cursor: pointer;
+}
+
+.club-finder .finder-chip:hover {
+    background: #eaf3ee;
+}
+
+.club-finder .finder-chip.active {
+    background: #1f6f4d;
+    color: white;
+}
+
 /* Autocomplete dropdown — anchored to the input, allowed to run wider than
    the (narrow) finder box so addresses stay readable. */
 .club-finder-field {
@@ -414,6 +455,38 @@ header h1 {
 .suggestion-badge.range-unset {
     background: #ececec;
     color: #666;
+}
+
+.suggestion-criteria {
+    margin: -0.5rem 0 0.8rem 0;
+    font-size: 0.8rem;
+    color: #1f6f4d;
+}
+
+/* Shown when nothing met every criterion and the nearest clubs are listed
+   instead, each with what didn't fit. */
+.suggestion-fallback {
+    margin: 0 0 0.8rem 0;
+    padding: 0.5rem 0.6rem;
+    background: #fff6e0;
+    border: 1px solid #e8c766;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
+.suggestion-trains {
+    margin-top: 0.2rem;
+    font-size: 0.75rem;
+    color: #1f6f4d;
+    font-weight: 600;
+}
+
+.suggestion-mismatch {
+    margin: 0.25rem 0 0 0;
+    padding-left: 1rem;
+    font-size: 0.75rem;
+    color: #a23b32;
 }
 
 .suggestion-hint {

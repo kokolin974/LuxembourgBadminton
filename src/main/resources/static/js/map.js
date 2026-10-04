@@ -1203,6 +1203,43 @@ let autocompleteItems = [];
 let autocompleteActiveIndex = -1;
 let autocompleteTimer = null;
 
+// Finder criteria: '' (any), 'hobby' or 'competition'; and the training days
+// wanted (a club matches if it trains on at least one). lastFinderParams is
+// the address/point part of the most recent search, so changing a criterion
+// can re-run it without retyping the address.
+const FINDER_DAYS = [
+    { name: 'Monday', short: 'Mo' }, { name: 'Tuesday', short: 'Tu' }, { name: 'Wednesday', short: 'We' },
+    { name: 'Thursday', short: 'Th' }, { name: 'Friday', short: 'Fr' }, { name: 'Saturday', short: 'Sa' },
+    { name: 'Sunday', short: 'Su' }
+];
+let finderType = '';
+const finderDays = new Set();
+let lastFinderParams = null;
+
+function finderCriteriaParams() {
+    let extra = '';
+    if (finderType) {
+        extra += `&type=${finderType}`;
+    }
+    if (finderDays.size > 0) {
+        // keep calendar order, not click order
+        extra += `&days=${FINDER_DAYS.filter(d => finderDays.has(d.name)).map(d => d.name).join(',')}`;
+    }
+    return extra;
+}
+
+// Human-readable summary of the active criteria, e.g. "Hobby · Mon, Wed".
+function finderCriteriaSummary() {
+    const parts = [];
+    if (finderType) {
+        parts.push(finderType === 'hobby' ? 'Hobby' : 'Competition');
+    }
+    if (finderDays.size > 0) {
+        parts.push(FINDER_DAYS.filter(d => finderDays.has(d.name)).map(d => d.name.slice(0, 3)).join(', '));
+    }
+    return parts.join(' · ');
+}
+
 function renderClubFinder() {
     clubFinder.innerHTML = `
         <h3>Find a club</h3>
@@ -1211,12 +1248,55 @@ function renderClubFinder() {
                 <input type="text" id="club-finder-input" placeholder="Enter an address" autocomplete="off"/>
                 <ul id="club-finder-autocomplete" class="club-finder-autocomplete" hidden></ul>
             </div>
+            <div class="finder-options">
+                <div class="finder-chip-row" id="finder-type-row" role="group" aria-label="What are you looking for">
+                    <button type="button" class="finder-chip active" data-type="">Any</button>
+                    <button type="button" class="finder-chip" data-type="hobby">Hobby</button>
+                    <button type="button" class="finder-chip" data-type="competition">Competition</button>
+                </div>
+                <div class="finder-days-label">Training days (any of)</div>
+                <div class="finder-chip-row" id="finder-days-row" role="group" aria-label="Training days">
+                    ${FINDER_DAYS.map(d =>
+                        `<button type="button" class="finder-chip finder-day" data-day="${d.name}" title="${d.name}">${d.short}</button>`
+                    ).join('')}
+                </div>
+            </div>
             <button type="submit">Search</button>
         </form>
     `;
 
     const form = document.getElementById('club-finder-form');
     const input = document.getElementById('club-finder-input');
+
+    // Changing a criterion re-runs the last search (if there was one and its
+    // results are showing) so the list updates without retyping the address.
+    function criteriaChanged() {
+        if (lastFinderParams && !suggestionPanel.hidden) {
+            fetchClubSuggestions(lastFinderParams, true);
+        }
+    }
+
+    document.querySelectorAll('#finder-type-row .finder-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            finderType = chip.dataset.type;
+            document.querySelectorAll('#finder-type-row .finder-chip').forEach(c =>
+                c.classList.toggle('active', c === chip));
+            criteriaChanged();
+        });
+    });
+
+    document.querySelectorAll('#finder-days-row .finder-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            const day = chip.dataset.day;
+            if (finderDays.has(day)) {
+                finderDays.delete(day);
+            } else {
+                finderDays.add(day);
+            }
+            chip.classList.toggle('active', finderDays.has(day));
+            criteriaChanged();
+        });
+    });
 
     form.addEventListener('submit', event => {
         event.preventDefault();
@@ -1344,12 +1424,15 @@ function runClubFinderByPoint(label, latitude, longitude) {
     fetchClubSuggestions(`lat=${latitude}&lon=${longitude}&label=${encodeURIComponent(label)}`);
 }
 
-function fetchClubSuggestions(params) {
+// `rerun` is true when this is just the same search repeated after a
+// criterion changed — it shouldn't re-center the map on the address again.
+function fetchClubSuggestions(params, rerun = false) {
+    lastFinderParams = params;
     suggestionPanel.hidden = false;
     suggestionPanelContent.innerHTML = '<p class="suggestion-status">Searching…</p>';
 
     const yearParam = currentYear != null ? `&year=${currentYear}` : '';
-    fetch(`/api/club-suggestions?${params}${yearParam}`)
+    fetch(`/api/club-suggestions?${params}${yearParam}${finderCriteriaParams()}`)
         .then(response => {
             if (response.status === 404) {
                 throw new Error('not-found');
@@ -1359,7 +1442,7 @@ function fetchClubSuggestions(params) {
             }
             return response.json();
         })
-        .then(renderSuggestions)
+        .then(data => renderSuggestions(data, { pan: !rerun }))
         .catch(err => {
             suggestionPanelContent.innerHTML = err.message === 'not-found'
                 ? '<p class="suggestion-status">Couldn\'t find that address. Try adding the town or postcode.</p>'
@@ -1367,9 +1450,10 @@ function fetchClubSuggestions(params) {
         });
 }
 
-function renderSuggestions(data) {
+function renderSuggestions(data, options = { pan: true }) {
     const resolved = data.resolved;
     const suggestions = data.suggestions || [];
+    const criteria = finderCriteriaSummary();
 
     if (addressMarker) {
         map.removeLayer(addressMarker);
@@ -1407,17 +1491,36 @@ function renderSuggestions(data) {
                     ${escapeHtml(s.club.city)} · ${s.distanceKm} km
                     ${rangeBadgeHtml(s.withinRange)}
                 </div>
+                ${(s.matchedDays && s.matchedDays.length)
+                    ? `<div class="suggestion-trains">Trains ${s.matchedDays.map(d => d.slice(0, 3)).join(', ')}</div>`
+                    : ''}
+                ${(s.mismatches && s.mismatches.length)
+                    ? `<ul class="suggestion-mismatch">${s.mismatches.map(m => `<li>${escapeHtml(m)}</li>`).join('')}</ul>`
+                    : ''}
             </div>
         </li>
     `).join('');
 
+    // Criteria were given but no club met all of them: the list below is the
+    // nearest clubs regardless, each one saying what doesn't fit.
+    const fallbackBanner = data.fallback
+        ? `<p class="suggestion-fallback">No club matches all of: <strong>${escapeHtml(criteria)}</strong>.
+           These are the ${suggestions.length} nearest clubs instead &mdash; what doesn&rsquo;t match is listed under each.</p>`
+        : '';
+    const criteriaLine = (criteria && !data.fallback)
+        ? `<p class="suggestion-criteria">Filtered by: <strong>${escapeHtml(criteria)}</strong></p>`
+        : '';
+
     suggestionPanelContent.innerHTML = `
         <h2>Clubs near this address</h2>
         <p class="suggestion-resolved">Showing results for:<br><strong>${escapeHtml(resolved.label)}</strong></p>
+        ${criteriaLine}
+        ${fallbackBanner}
         <ol class="suggestion-list">${items || '<li class="suggestion-status">No clubs on file for this year.</li>'}</ol>
         <p class="suggestion-hint">Ranked by straight-line distance. &ldquo;In range&rdquo; means the address is
         inside the club&rsquo;s area of influence for ${currentYear}; &ldquo;range not set&rdquo; means the club has
-        no level or radius assigned yet.</p>
+        no level or radius assigned yet. Hobby = Active for life, Competition = Performance. Training days use each
+        club&rsquo;s weekly schedule; a club with no schedule on file can&rsquo;t match a day.</p>
     `;
 
     suggestionPanelContent.querySelectorAll('.suggestion-item').forEach(el => {
@@ -1431,7 +1534,9 @@ function renderSuggestions(data) {
         });
     });
 
-    map.panTo([resolved.latitude, resolved.longitude]);
+    if (options.pan) {
+        map.panTo([resolved.latitude, resolved.longitude]);
+    }
 }
 
 suggestionPanelClose.addEventListener('click', () => {
