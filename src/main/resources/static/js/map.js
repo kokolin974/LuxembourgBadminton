@@ -72,6 +72,11 @@ const CoverageLayer = L.Layer.extend({
         // (still unblurred/unclipped). Only the final canvas is visible.
         this._densityCanvas = document.createElement('canvas');
         this._colorCanvas = document.createElement('canvas');
+        // _el is reused every time coverage is switched back on, so drop the
+        // previous visible canvas first. Without this, off -> on left the old
+        // canvas behind: never redrawn again, it sat there frozen while the
+        // new one underneath updated (the "heatmap locks up" bug).
+        L.DomUtil.empty(this._el);
         this._canvas = L.DomUtil.create('canvas', '', this._el);
         this._resizeCanvases(size);
 
