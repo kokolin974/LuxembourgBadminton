@@ -166,6 +166,15 @@ public class ClubService {
         clubYearRepository.deleteByClubIdAndYear(clubId, year);
     }
 
+    // Removes the year entirely — every club's snapshot for it, across the
+    // whole app. Clubs that have no other year on file effectively vanish
+    // (their Club identity row stays, just with nothing left to show); the
+    // club's other years, if any, are untouched.
+    @Transactional
+    public void deleteAllForYear(int year) {
+        clubYearRepository.deleteByYear(year);
+    }
+
     // Removes the club and every year's snapshot for it (cascades via Club.years).
     public void deleteClub(Long id) {
         clubRepository.deleteById(id);

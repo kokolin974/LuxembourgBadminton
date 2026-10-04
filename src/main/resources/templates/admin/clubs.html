@@ -21,8 +21,14 @@
     -->
     <div class="admin-year-bar">
         <span>Year:</span>
-        <a th:each="y : ${years}" th:href="@{/admin/clubs(year=${y})}"
-           th:text="${y}" th:classappend="${y == selectedYear} ? ' admin-year-active'" class="admin-year-link"></a>
+        <span th:each="y : ${years}" class="admin-year-item">
+            <a th:href="@{/admin/clubs(year=${y})}"
+               th:text="${y}" th:classappend="${y == selectedYear} ? ' admin-year-active'" class="admin-year-link"></a>
+            <form th:action="@{/admin/clubs/years/{year}/delete(year=${y})}" method="post" class="admin-year-delete-form"
+                  th:attr="onsubmit=|return confirm('Delete ALL club data for year ${y}? This removes every club\'s snapshot for that year across the whole app and cannot be undone.');|">
+                <button type="submit" class="admin-year-delete" th:title="'Delete year ' + ${y}">&times;</button>
+            </form>
+        </span>
 
         <form th:action="@{/admin/clubs/years}" method="post" class="admin-year-create">
             <label>New year

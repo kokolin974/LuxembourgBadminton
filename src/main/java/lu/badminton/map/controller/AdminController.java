@@ -127,6 +127,16 @@ public class AdminController {
         return "redirect:/admin/clubs?year=" + year;
     }
 
+    // Deletes the year entirely — every club's snapshot for it, across the
+    // whole app (confirmed client-side first; see the year bar). Redirects
+    // without a year param so the list falls back to whatever the new
+    // latest year is.
+    @PostMapping("/years/{year}/delete")
+    public String deleteYear(@PathVariable int year) {
+        clubService.deleteAllForYear(year);
+        return "redirect:/admin/clubs";
+    }
+
     @PostMapping("/{id}/years/{year}/update")
     public String update(@PathVariable Long id, @PathVariable int year, @ModelAttribute ClubForm form) {
         Club club = clubService.findClub(id);

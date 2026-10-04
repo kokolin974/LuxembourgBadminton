@@ -764,6 +764,34 @@ header h1 {
     color: white;
 }
 
+.admin-year-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.admin-year-delete-form {
+    display: inline-flex;
+}
+
+.admin-year-delete {
+    background: none;
+    border: 1px solid #c0392b;
+    color: #c0392b;
+    border-radius: 4px;
+    width: 1.4rem;
+    height: 1.4rem;
+    line-height: 1;
+    font-size: 0.85rem;
+    cursor: pointer;
+    padding: 0;
+}
+
+.admin-year-delete:hover {
+    background: #c0392b;
+    color: white;
+}
+
 .admin-year-create {
     margin-left: auto;
     display: flex;

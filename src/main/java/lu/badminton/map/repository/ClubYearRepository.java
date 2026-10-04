@@ -19,6 +19,8 @@ public interface ClubYearRepository extends JpaRepository<ClubYear, Long> {
 
     void deleteByClubIdAndYear(Long clubId, int year);
 
+    void deleteByYear(int year);
+
     @Query("select distinct cy.year from ClubYear cy order by cy.year")
     List<Integer> findDistinctYears();
 }
