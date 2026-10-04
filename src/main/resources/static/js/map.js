@@ -331,6 +331,13 @@ function refreshHeatmap() {
 // back to the plain house icon if the club has no level or its image fails to load.
 const DEFAULT_ICON_URL = '/img/house-marker.png';
 
+// Clubs not affiliated with the federation have no level, so they get their
+// own icon keyed on the filière value instead (same fallback to the plain
+// house if the image is missing). Kept in sync by hand with
+// ClubYear.FILIERE_NON_AFFILIE on the server.
+const NON_AFFILIE_FILIERE = 'Non affilié';
+const NON_AFFILIE_ICON_URL = '/img/notAffiliated.png';
+
 // Club-finder state: the pin dropped at a geocoded address, and the ids of
 // the clubs currently shown as suggestions for it (their markers get a ring
 // — see iconForClub). Both cleared when the finder panel is closed.
@@ -375,7 +382,12 @@ const MARKER_LABEL_WIDTH_PX = 130;
 const MARKER_LABEL_LINE_HEIGHT_PX = Math.round(MARKER_LABEL_FONT_PX * 1.35) + 3;
 
 function iconForClub(club, baseSize) {
-    const url = club.level ? `/img/clubLevel${club.level.level}.png` : DEFAULT_ICON_URL;
+    let url = DEFAULT_ICON_URL;
+    if (club.filiere === NON_AFFILIE_FILIERE) {
+        url = NON_AFFILIE_ICON_URL;
+    } else if (club.level) {
+        url = `/img/clubLevel${club.level.level}.png`;
+    }
     const size = Math.round(baseSize * levelSizeFactor(club.level));
 
     const labelFontSize = MARKER_LABEL_FONT_PX;

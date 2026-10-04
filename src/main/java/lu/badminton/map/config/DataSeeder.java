@@ -31,6 +31,7 @@ public class DataSeeder {
 
     private static final String CLUBS_CSV_PATH = "import/clubs_import.csv";
     private static final String SCHEDULES_CSV_PATH = "import/schedules_import.csv";
+    private static final String NON_AFFILIES_CSV_PATH = "import/non_affilies_import.csv";
 
     // The CSV has no year column — it's a single snapshot, so it's imported
     // as this one year. Later years are entered through the admin page.
@@ -52,6 +53,7 @@ public class DataSeeder {
 
             if (clubRepository.count() == 0) {
                 importClubsFromCsv(clubRepository, clubYearRepository, levelRepository);
+                importNonAffiliesFromCsv(clubRepository, clubYearRepository);
             }
 
             if (scheduleSlotRepository.count() == 0) {
@@ -101,6 +103,38 @@ public class DataSeeder {
                 clubYear.setCommunicationWebsite(blankToNull(record.get("5_website")));
                 clubYear.setCommunicationInstagram(blankToNull(record.get("5_instagram")));
                 clubYear.setCommunicationFacebook(blankToNull(record.get("5_facebook")));
+                clubYearRepository.save(clubYear);
+            }
+        }
+    }
+
+    // Reads import/non_affilies_import.csv — clubs that aren't affiliated with
+    // the federation. Only a handful of facts are known for them (name, city,
+    // coordinates, the filière value and a small default radius), so they get
+    // their own minimal file instead of blank cells in clubs_import.csv, which
+    // would make the prose composition above print empty "Manager: " lines.
+    // No level, so the radius comes from the explicit override column; all the
+    // house-floor texts are left empty.
+    private static void importNonAffiliesFromCsv(ClubRepository clubRepository,
+                                                   ClubYearRepository clubYearRepository) throws IOException {
+        ClassPathResource resource = new ClassPathResource(NON_AFFILIES_CSV_PATH);
+        CSVFormat format = CSVFormat.DEFAULT.builder().setHeader().setSkipHeaderRecord(true).build();
+
+        try (Reader reader = new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8);
+             CSVParser parser = format.parse(reader)) {
+
+            for (CSVRecord record : parser) {
+                Club club = new Club(
+                        record.get("name"),
+                        record.get("city"),
+                        Double.parseDouble(record.get("latitude")),
+                        Double.parseDouble(record.get("longitude")));
+                clubRepository.save(club);
+
+                ClubYear clubYear = new ClubYear(club, SEED_YEAR, null, null, null, null, null, null, null);
+                clubYear.setFiliere(blankToNull(record.get("filiere")));
+                String radius = record.get("radiusOverrideKm");
+                clubYear.setRadiusOverrideKm(isBlank(radius) ? null : Double.parseDouble(radius));
                 clubYearRepository.save(clubYear);
             }
         }

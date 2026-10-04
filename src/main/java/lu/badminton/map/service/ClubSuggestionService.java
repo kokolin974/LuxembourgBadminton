@@ -1,6 +1,7 @@
 package lu.badminton.map.service;
 
 import lu.badminton.map.model.ClubSuggestion;
+import lu.badminton.map.model.ClubYear;
 import lu.badminton.map.model.ClubYearView;
 import lu.badminton.map.model.GeocodeResult;
 import lu.badminton.map.model.SuggestionResponse;
@@ -55,7 +56,9 @@ public class ClubSuggestionService {
             point = resolved.get();
         }
 
+        // Non-affiliated clubs are shown on the map but never recommended here.
         List<ClubSuggestion> suggestions = clubService.findAllForYear(year).stream()
+                .filter(club -> !ClubYear.FILIERE_NON_AFFILIE.equals(club.getFiliere()))
                 .map(club -> toSuggestion(point, club))
                 .sorted(Comparator.comparingDouble(ClubSuggestion::distanceKm))
                 .limit(SUGGESTION_COUNT)

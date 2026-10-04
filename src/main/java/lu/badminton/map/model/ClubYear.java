@@ -19,6 +19,12 @@ import jakarta.persistence.UniqueConstraint;
 @Table(name = "club_year", uniqueConstraints = @UniqueConstraint(columnNames = {"club_id", "club_year_num"}))
 public class ClubYear {
 
+    // Filière value for clubs not affiliated with the federation. They get
+    // their own marker icon on the map and are left out of the "Find a club"
+    // suggestions. Kept in sync by hand with the admin dropdown option and
+    // NON_AFFILIE_FILIERE in map.js.
+    public static final String FILIERE_NON_AFFILIE = "Non affilié";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
