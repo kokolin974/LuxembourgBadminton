@@ -703,7 +703,11 @@ function markerPassesFilter(marker) {
 
 function applyFilter() {
     allMarkers.forEach(marker => {
-        const shouldShow = markerPassesFilter(marker);
+        // While the coverage heatmap is showing, the club icons (and their
+        // name labels) are hidden so the heat is easy to read. This only
+        // affects what's on the map — which clubs the heatmap counts still
+        // comes from markerPassesFilter alone (see getVisibleClubs).
+        const shouldShow = !heatmapVisible && markerPassesFilter(marker);
         const isShown = map.hasLayer(marker);
         if (shouldShow && !isShown) {
             marker.addTo(map);
@@ -1035,10 +1039,13 @@ function renderLevelFilter(levels, filieres) {
         heatmapVisible = event.target.checked;
         if (heatmapVisible) {
             coverageLayer.addTo(map);
-            refreshHeatmap();
         } else {
             map.removeLayer(coverageLayer);
         }
+        // Hides the club icons when coverage turns on and brings them back
+        // when it turns off; also redraws the heatmap (applyFilter ends with
+        // refreshHeatmap).
+        applyFilter();
     });
 
     levelFilter.querySelectorAll('.level-filter-checkbox').forEach(checkbox => {
