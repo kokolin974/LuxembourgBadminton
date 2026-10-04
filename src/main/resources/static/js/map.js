@@ -207,6 +207,27 @@ const CoverageLayer = L.Layer.extend({
             ctx.arc(c.x, c.y, c.radius, 0, 2 * Math.PI);
         });
         ctx.clip();
+
+        // Hard cut at the Luxembourg border: a second clip() intersects with
+        // the circle clip above, so heat survives only where a club's circle
+        // and the country overlap. Skipped (heat just shows unclipped) until
+        // the border file has loaded, or if it fails to.
+        if (luxembourgBorderRings) {
+            ctx.beginPath();
+            luxembourgBorderRings.forEach(ring => {
+                ring.forEach(([lat, lng], i) => {
+                    const p = this._map.latLngToContainerPoint([lat, lng]);
+                    if (i === 0) {
+                        ctx.moveTo(p.x, p.y);
+                    } else {
+                        ctx.lineTo(p.x, p.y);
+                    }
+                });
+                ctx.closePath();
+            });
+            ctx.clip();
+        }
+
         ctx.filter = `blur(${COVERAGE_BLUR_PX}px)`;
         ctx.drawImage(this._colorCanvas, 0, 0);
         ctx.filter = 'none';
@@ -288,6 +309,22 @@ function computeMaxOverlapDepth(clubs) {
 
 const coverageLayer = new CoverageLayer();
 let heatmapVisible = false;
+
+// Luxembourg's outer border (OpenStreetMap relation 2171347, ~2000 points),
+// loaded once and kept as [lat, lng] rings for CoverageLayer to clip to.
+// GeoJSON stores [lng, lat], hence the swap. Only each polygon's outer ring is
+// used — the country has no holes. Null until loaded.
+let luxembourgBorderRings = null;
+
+fetch('/geo/luxembourg.geojson')
+    .then(response => response.json())
+    .then(geo => {
+        const geometry = geo.features ? geo.features[0].geometry : geo.geometry || geo;
+        const polygons = geometry.type === 'MultiPolygon' ? geometry.coordinates : [geometry.coordinates];
+        luxembourgBorderRings = polygons.map(polygon => polygon[0].map(([lng, lat]) => [lat, lng]));
+        refreshHeatmap(); // redraw in case coverage was switched on before this arrived
+    })
+    .catch(err => console.error('Failed to load the Luxembourg border; heatmap stays unclipped', err));
 
 // Headroom above the true peak, per product decision: without it, the
 // single most-overlapped spot would render as pure max-color,
