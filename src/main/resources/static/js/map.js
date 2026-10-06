@@ -360,6 +360,121 @@ function setHeatmapClubs(clubs) {
         return;
     }
     coverageLayer.setClubs(clubs);
+    updateCoverageStats(clubs);
+}
+
+// --- Country coverage indicator ----------------------------------------
+// Share of Luxembourg's area reached by 0 / 1 / 2-3 / 4+ clubs, for exactly
+// the club list the heatmap is drawing (so it follows the filters, the year,
+// radius changes and the single-club view). Measured by sampling a grid of
+// points inside the border polygon and counting how many club circles contain
+// each one. The grid depends only on the border, so it's built once.
+
+const COVERAGE_GRID_STEP_M = 500;
+const COVERAGE_REF = { lat: 49.8153, lng: 6.1296 };   // projection origin (country centre)
+let coverageGrid = null;                               // [{x, y}] in metres, inside the country
+
+function pointInRing(x, y, ring) {
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        if ((ring[i].y > y) !== (ring[j].y > y)
+            && x < (ring[j].x - ring[i].x) * (y - ring[i].y) / (ring[j].y - ring[i].y) + ring[i].x) {
+            inside = !inside;
+        }
+    }
+    return inside;
+}
+
+// Null until the border file has loaded.
+function ensureCoverageGrid() {
+    if (coverageGrid || !luxembourgBorderRings) {
+        return coverageGrid;
+    }
+    const rings = luxembourgBorderRings.map(ring =>
+        ring.map(([lat, lng]) => projectToMeters(lat, lng, COVERAGE_REF.lat, COVERAGE_REF.lng)));
+    const all = rings.flat();
+    const minX = Math.min(...all.map(p => p.x)), maxX = Math.max(...all.map(p => p.x));
+    const minY = Math.min(...all.map(p => p.y)), maxY = Math.max(...all.map(p => p.y));
+    const points = [];
+    for (let x = minX; x <= maxX; x += COVERAGE_GRID_STEP_M) {
+        for (let y = minY; y <= maxY; y += COVERAGE_GRID_STEP_M) {
+            if (rings.some(ring => pointInRing(x, y, ring))) {
+                points.push({ x, y });
+            }
+        }
+    }
+    coverageGrid = points;
+    return coverageGrid;
+}
+
+// Returns percentages [none, one, twoOrThree, moreThanThree] summing to ~100,
+// or null if the border isn't loaded yet. Clubs without a radius cover nothing.
+function computeCoverageStats(clubs) {
+    const grid = ensureCoverageGrid();
+    if (!grid || grid.length === 0) {
+        return null;
+    }
+    const circles = clubs.filter(club => club.effectiveRadiusKm).map(club => {
+        const p = projectToMeters(club.latitude, club.longitude, COVERAGE_REF.lat, COVERAGE_REF.lng);
+        const radius = club.effectiveRadiusKm * 1000;
+        return { x: p.x, y: p.y, r2: radius * radius };
+    });
+    const counts = [0, 0, 0, 0];
+    for (const point of grid) {
+        let n = 0;
+        for (const c of circles) {
+            const dx = point.x - c.x, dy = point.y - c.y;
+            if (dx * dx + dy * dy <= c.r2 && ++n > 3) {
+                break;
+            }
+        }
+        counts[n === 0 ? 0 : n === 1 ? 1 : n <= 3 ? 2 : 3]++;
+    }
+    return counts.map(count => (count / grid.length) * 100);
+}
+
+const coverageStatsEl = document.getElementById('coverage-stats');
+const COVERAGE_STATS_ROWS = [
+    { label: 'No clubs', color: '#d9d9d9' },
+    { label: '1 club', color: '#67a9cf' },
+    { label: '2 or 3 clubs', color: '#74c476' },
+    { label: 'More than 3 clubs', color: '#d73027' }
+];
+
+// Rounds each share to one decimal while forcing the four to total exactly
+// 100.0 (largest-remainder method) — independent rounding can leave 99.9.
+function roundSharesToHundred(pct) {
+    const tenths = pct.map(p => p * 10);
+    const floors = tenths.map(Math.floor);
+    let missing = 1000 - floors.reduce((a, b) => a + b, 0);
+    tenths.map((t, i) => ({ i, rem: t - floors[i] }))
+        .sort((a, b) => b.rem - a.rem)
+        .forEach(({ i }) => { if (missing > 0) { floors[i]++; missing--; } });
+    return floors.map(t => t / 10);
+}
+
+function updateCoverageStats(clubs) {
+    const raw = heatmapVisible ? computeCoverageStats(clubs) : null;
+    if (!raw) {
+        coverageStatsEl.hidden = true;
+        return;
+    }
+    const pct = roundSharesToHundred(raw);
+    const bar = COVERAGE_STATS_ROWS.map((row, i) =>
+        `<span style="width:${pct[i]}%; background:${row.color}"></span>`).join('');
+    const rows = COVERAGE_STATS_ROWS.map((row, i) => `
+        <li>
+            <span class="coverage-swatch" style="background:${row.color}"></span>
+            <span class="coverage-label">${row.label}</span>
+            <strong>${pct[i].toFixed(1)}%</strong>
+        </li>`).join('');
+    coverageStatsEl.innerHTML = `
+        <h3>Country coverage</h3>
+        <div class="coverage-bar">${bar}</div>
+        <ul>${rows}</ul>
+        <p class="coverage-note">Share of Luxembourg&rsquo;s area within reach of that many of the clubs currently shown.</p>
+    `;
+    coverageStatsEl.hidden = false;
 }
 
 // Refreshes to whatever the level filter currently allows. When a single
@@ -1083,6 +1198,7 @@ function renderLevelFilter(levels, filieres) {
             coverageLayer.addTo(map);
         } else {
             map.removeLayer(coverageLayer);
+            coverageStatsEl.hidden = true;
         }
         // Hides the club icons when coverage turns on and brings them back
         // when it turns off; also redraws the heatmap (applyFilter ends with
